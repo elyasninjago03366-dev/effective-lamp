@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>3D Aim Trainer</title>
+  <script>p5.disableFriendlyErrors = true;</script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.11.3/p5.min.js"></script>
+  <style>
+    html, body { margin: 0; padding: 0; overflow: hidden; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #1a1a2e; color: #e0e0e0; }
+    canvas { display: block; }
+    #overlay {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      pointer-events: none; /* Allows mouse events to pass through to canvas */
+    }
+    #score-display, #ammo-display {
+      padding: 15px;
+      font-size: 1.5em;
+      font-weight: bold;
+      text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
+    }
+    #score-display { align-self: flex-start; }
+    #ammo-display { align-self: flex-end; }
+    #crosshair {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      width: 20px;
+      height: 20px;
+      margin-left: -10px;
+      margin-top: -10px;
+      border: 2px solid #ffcc00;
+      border-radius: 50%;
+      box-shadow: 0 0 10px #ffcc00;
+      pointer-events: none;
+    }
+  </style>
+</head>
+<body>
+<div id="overlay">
+  <div id="score-display">Score: 0</div>
+  <div id="ammo-display">Ammo: 10</div>
+  <div id="crosshair"></div>
+</div>
+<script>
+let font;
+let targetPos;
+let score = 0;
+let ammo = 10;
+let targetSize = 50;
+let lastShotTime = 0;
+const shotCooldown = 300; // ms between shots
+
+function setup() {
+  createCanvas(windowWidth, windowHeight, WEBGL);
+  // Disable right-click context menu
+  document.oncontextmenu = function() { return false; }
+  resetTarget();
+  updateHUD();
+}
+
+function draw() {
+  background(26, 26, 46); // Dark blue/purple background
+
+  // Camera control with mouse (first-person style)
+  let camX = map(mouseX, 0, width, -width / 2, width / 2);
+  let camY = map(mouseY, 0, height, -height / 2, height / 2);
+  camera(camX, camY, (height/2) / tan(PI/6), 0, 0, 0, 0, 1, 0);
+
+  // Lighting
+  pointLight(200, 200, 255, -200, -200, 500); // Blueish light from top-left-front
+  ambientLight(50); // Subtle ambient light
+
+  // Draw Target
+  push();
+  translate(targetPos.x, targetPos.y, targetPos.z);
+  rotateY(frameCount * 0.01);
+  rotateX(frameCount * 0.005);
+
+  // Target material
+  specularMaterial(255, 100, 100); // Reddish-pink
+  shininess(20);
+  sphere(targetSize);
+
+  // Pulsating glow (emissive material)
+  let pulse = map(sin(frameCount * 0.05), -1, 1, 0.5, 1.5);
+  emissiveMaterial(150 * pulse, 0, 0);
+  sphere(targetSize * 0.9); // Inner glowing sphere
+
+  pop();
+
+  // Ground plane
+  push();
+  translate(0, 200, 0);
+  rotateX(HALF_PI);
+  noStroke();
+  specularMaterial(50, 50, 70); // Dark grey ground
+  shininess(1);
+  plane(1000, 1000);
+  pop();
+}
+
+function mousePressed() {
+  // Only register clicks if ammo is available and cooldown is over
+  if (ammo > 0 && millis() - lastShotTime > shotCooldown) {
+    ammo--;
+    lastShotTime = millis();
+    updateHUD();
+
+    // Raycasting to check if target is hit
+    let ray = getRayFromMouse();
+    let hit = intersectRaySphere(ray.origin, ray.direction, targetPos, targetSize);
+
+    if (hit) {
+      score++;
+      resetTarget();
+      updateHUD();
+      console.log("Hit! Score: " + score);
+    } else {
+      console.log("Miss. Ammo: " + ammo);
+    }
+
+    if (ammo === 0) {
+      setTimeout(() => {
+        alert(`Game Over! Final Score: ${score}`);
+        score = 0;
+        ammo = 10;
+        resetTarget();
+        updateHUD();
+      }, 500); // Small delay before alert
+    }
+  }
+}
+
+function resetTarget() {
+  targetPos = createVector(
+    random(-width / 3, width / 3),
+    random(-height / 3, height / 3),
+    random(-500, -100)
+  );
+  targetSize = random(40, 70); // Vary target size
+}
+
+function updateHUD() {
+  document.getElementById('score-display').innerText = `Score: ${score}`;
+  document.getElementById('ammo-display').innerText = `Ammo: ${ammo}`;
+}
+
+function windowResized() {
+  resizeCanvas(windowWidth, windowHeight);
+}
+
+// --- Raycasting Helper Functions ---
+// Gets a ray from the mouse position in 3D space
+function getRayFromMouse() {
+  // Convert mouse position to clip space
+  let mouseXNormalized = (mouseX / width) * 2 - 1;
+  let mouseYNormalized = (mouseY / height) * 2 - 1;
+
+  // Inverse projection matrix
+  let projInv = new p5.Matrix();
+  projInv.invert(projectionMatrix);
+
+  // Inverse camera matrix
+  let camInv = new p5.Matrix();
+  camInv.invert(modelViewMatrix);
+
+  // Vector in clip space pointing to mouse
+  let v = createVector(mouseXNormalized, -mouseYNormalized, -1); // -1 for near plane
+  let v4 = createVector(v.x, v.y, v.z, 1);
+
+  // Transform to eye space
+  v4 = multMatrixVector(projInv, v4);
+  v4.z = -1; // Set to -1 for ray direction
+  v4.w = 0; // Set w to 0 for ray direction
+
+  // Transform to world space
+  v4 = multMatrixVector(camInv, v4);
+
+  let rayDirection = createVector(v4.x, v4.y, v4.z).normalize();
+  let rayOrigin = createVector(camInv.mat[12], camInv.mat[13], camInv.mat[14]); // Camera position
+
+  return { origin: rayOrigin, direction: rayDirection };
+}
+
+// Matrix-vector multiplication for p5.Matrix and p5.Vector
+function multMatrixVector(matrix, vector) {
+  let x = matrix.mat[0] * vector.x + matrix.mat[4] * vector.y + matrix.mat[8] * vector.z + matrix.mat[12] * vector.w;
+  let y = matrix.mat[1] * vector.x + matrix.mat[5] * vector.y + matrix.mat[9] * vector.z + matrix.mat[13] * vector.w;
+  let z = matrix.mat[2] * vector.x + matrix.mat[6] * vector.y + matrix.mat[10] * vector.z + matrix.mat[14] * vector.w;
+  let w = matrix.mat[3] * vector.x + matrix.mat[7] * vector.y + matrix.mat[11] * vector.z + matrix.mat[15] * vector.w;
+  return createVector(x, y, z, w);
+}
+
+
+// Ray-sphere intersection test
+function intersectRaySphere(rayOrigin, rayDirection, sphereCenter, sphereRadius) {
+  let L = p5.Vector.sub(sphereCenter, rayOrigin);
+  let tca = L.dot(rayDirection);
+  if (tca < 0) return false; // Sphere is behind the ray origin
+
+  let d2 = L.magSq() - (tca * tca);
+  let radius2 = sphereRadius * sphereRadius;
+  if (d2 > radius2) return false; // Ray misses the sphere
+
+  let thc = sqrt(radius2 - d2);
+  let t0 = tca - thc;
+  let t1 = tca + thc;
+
+  // We are interested in the closest intersection point that is in front of the ray origin
+  if (t0 < 0 && t1 < 0) return false; // Both intersection points are behind the ray origin
+  if (t0 < 0) t0 = t1; // If t0 is behind, use t1
+
+  // Point of intersection: rayOrigin + t0 * rayDirection
+  // For aim trainer, we only care if it hits, not the exact point
+  return true;
+}
+
+</script>
+</body>
+</html>
