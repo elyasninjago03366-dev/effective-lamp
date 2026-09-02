@@ -3,620 +3,499 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>3D Aim Trainer</title>
-  <script>p5.disableFriendlyErrors = true;</script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.11.3/p5.min.js"></script>
+  <title>Aim Trainer</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
-    html, body { width: 100%; height: 100%; overflow: hidden; background: #000; }
-    canvas { display: block; }
+    body { overflow: hidden; background: #0a0a0f; font-family: 'Segoe UI', system-ui, sans-serif; }
+    canvas { display: block; cursor: none; }
 
-    #overlay {
-      position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-      pointer-events: none; z-index: 10;
-      font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
-      color: #fff;
+    #hud {
+      position: fixed; top: 0; left: 0; width: 100%; padding: 18px 28px;
+      display: flex; justify-content: space-between; z-index: 10;
+      pointer-events: none;
     }
+    .hud-card {
+      background: rgba(0,0,0,0.55); border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 12px; padding: 10px 22px; backdrop-filter: blur(12px);
+    }
+    .hud-label { font-size: 10px; text-transform: uppercase; letter-spacing: 2.5px; color: rgba(255,255,255,0.4); }
+    .hud-val { font-size: 32px; font-weight: 800; line-height: 1.1; }
+    .c-blue { color: #4fc3f7; }
+    .c-orange { color: #ffab40; }
+    .c-red { color: #ef5350; }
 
-    #hud-top {
-      display: flex; justify-content: space-between; align-items: flex-start;
-      padding: 20px 30px;
+    #cross {
+      position: fixed; top: 50%; left: 50%; transform: translate(-50%,-50%);
+      z-index: 20; pointer-events: none;
     }
-    #hud-top .hud-box {
-      background: rgba(0,0,0,0.5); border: 1px solid rgba(255,255,255,0.1);
-      border-radius: 10px; padding: 12px 20px; backdrop-filter: blur(8px);
-    }
-    .hud-label { font-size: 11px; text-transform: uppercase; letter-spacing: 2px; color: rgba(255,255,255,0.5); }
-    .hud-value { font-size: 28px; font-weight: 700; margin-top: 2px; }
-    .hud-value.score-val { color: #4fc3f7; }
-    .hud-value.combo-val { color: #ffb74d; }
-    .hud-value.ammo-val { color: #ef5350; }
+    .cross-line { position: absolute; background: rgba(255,255,255,0.9); }
+    .cross-v { width: 2px; height: 18px; top: -9px; left: -1px; }
+    .cross-h { width: 18px; height: 2px; top: -1px; left: -9px; }
+    .cross-dot { width: 4px; height: 4px; border-radius: 50%; background: #ff1744; position: absolute; top: -2px; left: -2px; }
 
-    #crosshair {
-      position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
-      pointer-events: none; z-index: 20;
+    #center-panel {
+      position: fixed; inset: 0; display: flex; align-items: center; justify-content: center;
+      z-index: 50; pointer-events: auto;
     }
-    #crosshair::before, #crosshair::after {
-      content: ''; position: absolute; background: rgba(255,255,255,0.85);
+    #center-panel.hidden { display: none; }
+    .panel-box {
+      text-align: center; background: rgba(0,0,0,0.7); border: 1px solid rgba(255,255,255,0.06);
+      border-radius: 20px; padding: 50px 70px; backdrop-filter: blur(20px);
     }
-    #crosshair::before { width: 2px; height: 16px; top: -8px; left: -1px; }
-    #crosshair::after { width: 16px; height: 2px; top: -1px; left: -8px; }
-    #crosshair-dot {
-      width: 4px; height: 4px; border-radius: 50%; background: #ff1744;
-      position: absolute; top: -2px; left: -2px;
+    .panel-box h1 { font-size: 42px; font-weight: 800; color: #fff; margin-bottom: 6px; }
+    .panel-box .sub { font-size: 15px; color: rgba(255,255,255,0.45); margin-bottom: 24px; }
+    .panel-box .stat { font-size: 17px; color: rgba(255,255,255,0.7); margin: 4px 0; }
+    .panel-box .stat strong { color: #4fc3f7; font-weight: 700; }
+    .start-btn {
+      display: inline-block; margin-top: 28px; padding: 14px 44px;
+      background: rgba(79,195,247,0.15); border: 1px solid rgba(79,195,247,0.35);
+      border-radius: 10px; color: #4fc3f7; font-size: 15px; font-weight: 600;
+      cursor: pointer; transition: all 0.2s; animation: glow 2s ease-in-out infinite;
     }
+    .start-btn:hover { background: rgba(79,195,247,0.25); }
+    @keyframes glow { 0%,100%{opacity:0.7} 50%{opacity:1} }
 
-    #center-msg {
-      position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
-      text-align: center; pointer-events: auto; z-index: 30;
-    }
-    #center-msg h1 {
-      font-size: 48px; font-weight: 800; margin-bottom: 10px;
-      text-shadow: 0 0 30px rgba(79, 195, 247, 0.5);
-    }
-    #center-msg p { font-size: 16px; color: rgba(255,255,255,0.6); margin-top: 8px; }
-    #center-msg .click-hint {
-      display: inline-block; margin-top: 20px; padding: 12px 30px;
-      background: rgba(79, 195, 247, 0.2); border: 1px solid rgba(79, 195, 247, 0.4);
-      border-radius: 8px; font-size: 14px; color: #4fc3f7;
-      animation: pulse-hint 2s ease-in-out infinite;
-    }
-    @keyframes pulse-hint {
-      0%, 100% { opacity: 0.6; } 50% { opacity: 1; }
+    #timer-fill {
+      position: fixed; bottom: 0; left: 0; height: 3px; z-index: 15;
+      background: linear-gradient(90deg,#4fc3f7,#ff8a65);
+      transition: width 0.08s linear;
     }
 
-    #hit-marker {
-      position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
-      pointer-events: none; z-index: 25; opacity: 0;
-      transition: opacity 0.08s;
+    .float-text {
+      position: fixed; pointer-events: none; z-index: 30; font-weight: 800;
+      animation: floatUp 0.55s ease-out forwards;
     }
-    #hit-marker.show { opacity: 1; }
-    #hit-marker .line {
-      position: absolute; background: #fff; transform-origin: center;
-    }
-    #hit-marker .line:nth-child(1) { width: 2px; height: 12px; top: -18px; left: -1px; }
-    #hit-marker .line:nth-child(2) { width: 2px; height: 12px; top: 6px; left: -1px; }
-    #hit-marker .line:nth-child(3) { width: 12px; height: 2px; top: -1px; left: -18px; }
-    #hit-marker .line:nth-child(4) { width: 12px; height: 2px; top: -1px; left: 6px; }
-
-    .hit-text {
-      position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
-      font-size: 24px; font-weight: 800; color: #4fc3f7;
-      pointer-events: none; z-index: 26;
-      animation: hit-float 0.6s ease-out forwards;
-    }
-    .hit-text.miss { color: #ef5350; font-size: 18px; }
-    @keyframes hit-float {
-      0% { opacity: 1; transform: translate(-50%, -50%) scale(1.2); }
-      100% { opacity: 0; transform: translate(-50%, -120%) scale(0.8); }
-    }
-
-    #reload-hint {
-      position: absolute; bottom: 15%; left: 50%; transform: translateX(-50%);
-      font-size: 14px; color: rgba(255,255,255,0.4); pointer-events: none;
-      z-index: 20; display: none;
-    }
-
-    #timer-bar {
-      position: absolute; bottom: 0; left: 0; height: 3px;
-      background: linear-gradient(90deg, #4fc3f7, #ff8a65);
-      transition: width 0.1s linear; z-index: 15;
+    @keyframes floatUp {
+      0% { opacity: 1; transform: translate(-50%,0) scale(1.3); }
+      100% { opacity: 0; transform: translate(-50%,-70px) scale(0.8); }
     }
   </style>
 </head>
 <body>
-<div id="overlay">
-  <div id="hud-top">
-    <div class="hud-box">
-      <div class="hud-label">Score</div>
-      <div class="hud-value score-val" id="score-val">0</div>
-    </div>
-    <div class="hud-box">
-      <div class="hud-label">Combo</div>
-      <div class="hud-value combo-val" id="combo-val">x1</div>
-    </div>
-    <div class="hud-box">
-      <div class="hud-label">Ammo</div>
-      <div class="hud-value ammo-val" id="ammo-val">∞</div>
-    </div>
-  </div>
-  <div id="crosshair"><div id="crosshair-dot"></div></div>
-  <div id="hit-marker"><div class="line"></div><div class="line"></div><div class="line"></div><div class="line"></div></div>
-  <div id="center-msg">
-    <h1>3D Aim Trainer</h1>
-    <p>Click targets as fast as you can. Track your mouse accuracy.</p>
-    <div class="click-hint">CLICK TO START</div>
-  </div>
-  <div id="reload-hint">Click to resume</div>
-  <div id="timer-bar"></div>
+
+<div id="hud">
+  <div class="hud-card"><div class="hud-label">Score</div><div class="hud-val c-blue" id="v-score">0</div></div>
+  <div class="hud-card"><div class="hud-label">Combo</div><div class="hud-val c-orange" id="v-combo">x1</div></div>
+  <div class="hud-card"><div class="hud-label">Time</div><div class="hud-val c-red" id="v-time">30</div></div>
 </div>
 
+<div id="cross">
+  <div class="cross-line cross-v"></div>
+  <div class="cross-line cross-h"></div>
+  <div class="cross-dot"></div>
+</div>
+
+<div id="center-panel">
+  <div class="panel-box" id="panel-content">
+    <h1>Aim Trainer</h1>
+    <div class="sub">شلیک کن، ترکیب بزن، امتیاز بگیر</div>
+    <div class="start-btn" id="btn-start">CLICK TO START</div>
+  </div>
+</div>
+
+<div id="timer-fill"></div>
+
 <script>
-// ============ CONFIGURATION ============
-const CFG = {
-  GAME_TIME: 30,          // seconds per round
-  TARGET_MIN_SIZE: 20,
-  TARGET_MAX_SIZE: 50,
-  TARGET_SPAWN_TIME: 1500, // ms between spawns
-  TARGET_LIFETIME: 3000,   // ms before target disappears
-  MAX_TARGETS: 5,
-  WORLD_SIZE: 2000,        // world bounds
-  CAM_SENSITIVITY: 0.002,
-  COMBO_DECAY: 2000,       // ms before combo resets
-};
-
-// ============ AUDIO (Web Audio API) ============
+// ============== AUDIO ==============
 let audioCtx;
-function initAudio() {
-  audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-}
-function playHitSound() {
+function initAudio() { audioCtx = new (window.AudioContext || window.webkitAudioContext)(); }
+function snd(freq, dur, type, vol) {
   if (!audioCtx) return;
-  const osc = audioCtx.createOscillator();
-  const gain = audioCtx.createGain();
-  osc.connect(gain);
-  gain.connect(audioCtx.destination);
-  osc.type = 'sine';
-  osc.frequency.setValueAtTime(880, audioCtx.currentTime);
-  osc.frequency.exponentialRampToValueAtTime(1760, audioCtx.currentTime + 0.05);
-  gain.gain.setValueAtTime(0.15, audioCtx.currentTime);
-  gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.1);
-  osc.start(audioCtx.currentTime);
-  osc.stop(audioCtx.currentTime + 0.1);
+  const o = audioCtx.createOscillator(), g = audioCtx.createGain();
+  o.connect(g); g.connect(audioCtx.destination);
+  o.type = type; o.frequency.setValueAtTime(freq, audioCtx.currentTime);
+  g.gain.setValueAtTime(vol, audioCtx.currentTime);
+  g.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + dur);
+  o.start(); o.stop(audioCtx.currentTime + dur);
 }
-function playMissSound() {
-  if (!audioCtx) return;
-  const osc = audioCtx.createOscillator();
-  const gain = audioCtx.createGain();
-  osc.connect(gain);
-  gain.connect(audioCtx.destination);
-  osc.type = 'sawtooth';
-  osc.frequency.setValueAtTime(150, audioCtx.currentTime);
-  osc.frequency.exponentialRampToValueAtTime(80, audioCtx.currentTime + 0.15);
-  gain.gain.setValueAtTime(0.08, audioCtx.currentTime);
-  gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.15);
-  osc.start(audioCtx.currentTime);
-  osc.stop(audioCtx.currentTime + 0.15);
-}
+function sndHit()  { snd(880,0.08,'sine',0.18); snd(1320,0.06,'sine',0.10); }
+function sndMiss() { snd(120,0.15,'sawtooth',0.07); }
+function sndKill() { snd(660,0.1,'sine',0.15); snd(990,0.15,'sine',0.12); snd(1320,0.2,'sine',0.08); }
 
-// ============ GAME STATE ============
-let gameState = 'menu'; // menu, playing, ended
-let score = 0;
-let combo = 1;
-let maxCombo = 1;
-let lastHitTime = 0;
+// ============== CONSTANTS ==============
+const ROUND_TIME = 30;
+const MAX_TARGETS = 6;
+const SPAWN_INTERVAL = 900;
+const TARGET_LIFE_MIN = 1200;
+const TARGET_LIFE_MAX = 3000;
+const SENSITIVITY = 0.0018;
+const COMBO_TIMEOUT = 2200;
+const WORLD = 1800;
+
+// ============== STATE ==============
+let state = 'menu';
+let score, combo, maxCombo, shots, hits;
+let camYaw = 0, camPitch = 0;
 let targets = [];
-let particles = [];
-let lastSpawnTime = 0;
-let gameStartTime = 0;
-let timeRemaining = CFG.GAME_TIME;
-let totalShots = 0;
-let totalHits = 0;
+let sparks = [];
+let trailRings = [];
+let lastSpawn = 0;
+let t0 = 0;
+let lastHit = 0;
+let timeLeft = ROUND_TIME;
 
-// Camera state (Euler angles, FPS style)
-let camYaw = 0;
-let camPitch = 0;
-let camX = 0, camY = 0, camZ = 0;
-
-// ============ TARGET CLASS ============
+// ============== TARGET ==============
 class Target {
   constructor() {
-    this.pos = createVector(
-      random(-CFG.WORLD_SIZE/3, CFG.WORLD_SIZE/3),
-      random(-300, 300),
-      random(-1500, -200)
-    );
-    this.size = random(CFG.TARGET_MIN_SIZE, CFG.TARGET_MAX_SIZE);
-    this.spawnTime = millis();
-    this.lifetime = random(2000, CFG.TARGET_LIFETIME);
+    this.x = (Math.random() - 0.5) * WORLD * 0.65;
+    this.y = (Math.random() - 0.5) * 500;
+    this.z = -200 - Math.random() * 1200;
+    this.r = 18 + Math.random() * 32;
+    this.born = performance.now();
+    this.life = TARGET_LIFE_MIN + Math.random() * (TARGET_LIFE_MAX - TARGET_LIFE_MIN);
+    this.drift = { x: (Math.random()-0.5)*0.4, y: (Math.random()-0.5)*0.3 };
+    this.phase = Math.random() * 6.28;
     this.alive = true;
-    this.hitAnim = 0;
-    this.bobOffset = random(TWO_PI);
-    this.bobSpeed = random(0.02, 0.06);
-    this.driftX = random(-0.3, 0.3);
-    this.driftY = random(-0.2, 0.2);
   }
-
+  age() { return performance.now() - this.born; }
+  progress() { return this.age() / this.life; }
+  alive() { return this.progress() < 1 && this.alive; }
   update() {
-    let age = millis() - this.spawnTime;
-    if (age > this.lifetime) {
-      this.alive = false;
-      // Missed target breaks combo
-      if (gameState === 'playing' && millis() - lastHitTime > CFG.COMBO_DECAY) {
-        combo = 1;
-      }
-      return;
-    }
-    this.pos.x += this.driftX;
-    this.pos.y += Math.sin(millis() * this.bobSpeed * 0.01 + this.bobOffset) * 0.5;
-  }
-
-  draw() {
-    let age = millis() - this.spawnTime;
-    let lifeRatio = age / this.lifetime;
-    let alpha = lifeRatio < 0.8 ? 1 : map(lifeRatio, 0.8, 1, 1, 0);
-    let fadeScale = lifeRatio < 0.8 ? 1 : map(lifeRatio, 0.8, 1, 1, 0.3);
-
-    push();
-    translate(this.pos.x, this.pos.y, this.pos.z);
-
-    // Outer ring
-    noFill();
-    strokeWeight(2);
-    stroke(255, 100, 80, 255 * alpha);
-    sphere(this.size * fadeScale);
-
-    // Inner core
-    specularMaterial(255, 80, 60);
-    shininess(50);
-    emissiveMaterial(180, 40, 30);
-    sphere(this.size * 0.6 * fadeScale);
-
-    // Glow
-    emissiveMaterial(255, 100, 60, 100 * alpha);
-    sphere(this.size * 0.8 * fadeScale);
-
-    pop();
-  }
-
-  isExpired() {
-    return !this.alive;
+    this.x += this.drift.x;
+    this.y += Math.sin(performance.now() * 0.003 + this.phase) * 0.4;
   }
 }
 
-// ============ PARTICLE CLASS ============
-class Particle {
-  constructor(x, y, z) {
-    this.pos = createVector(x, y, z);
-    this.vel = p5.Vector.random3D().mult(random(2, 8));
-    this.life = 1;
-    this.decay = random(0.02, 0.05);
-    this.size = random(3, 8);
-    this.col = [
-      random(200, 255), random(80, 200), random(40, 100)
-    ];
+// ============== SPARK ==============
+class Spark {
+  constructor(x,y,z) {
+    this.x=x; this.y=y; this.z=z;
+    this.vx=(Math.random()-0.5)*12;
+    this.vy=(Math.random()-0.5)*12;
+    this.vz=(Math.random()-0.5)*12;
+    this.life=1;
+    this.decay=0.025+Math.random()*0.03;
+    this.s=2+Math.random()*5;
+    this.r=200+Math.random()*55;
+    this.g=60+Math.random()*140;
+    this.b=30+Math.random()*60;
   }
-  update() {
-    this.pos.add(this.vel);
-    this.vel.mult(0.96);
-    this.life -= this.decay;
-  }
-  draw() {
-    push();
-    translate(this.pos.x, this.pos.y, this.pos.z);
-    noStroke();
-    emissiveMaterial(this.col[0], this.col[1], this.col[2]);
-    sphere(this.size * this.life);
-    pop();
-  }
+  update(){ this.x+=this.vx; this.y+=this.vy; this.z+=this.vz; this.vx*=0.95; this.vy*=0.95; this.vz*=0.95; this.life-=this.decay; }
 }
 
-// ============ P5.JS LIFECYCLE ============
-function setup() {
-  let canvas = createCanvas(windowWidth, windowHeight, WEBGL);
-  canvas.style('display', 'block');
-
-  document.oncontextmenu = () => false;
-
-  // Pointer Lock
-  canvas.elt.addEventListener('click', onCanvasClick);
-
-  document.addEventListener('pointerlockchange', () => {
-    if (!document.pointerLockElement) {
-      if (gameState === 'playing') {
-        // Paused — show resume hint
-        document.getElementById('reload-hint').style.display = 'block';
-        document.getElementById('center-msg').style.display = 'none';
-      }
-    } else {
-      document.getElementById('reload-hint').style.display = 'none';
-      document.getElementById('center-msg').style.display = 'none';
-    }
-  });
+// ============== TRAIL RING ==============
+class TrailRing {
+  constructor(x,y,z) { this.x=x; this.y=y; this.z=z; this.born=performance.now(); this.life=400; }
+  progress(){ return (performance.now()-this.born)/this.life; }
 }
 
-function onCanvasClick() {
-  if (gameState === 'menu') {
-    startGame();
-    return;
-  }
-  if (gameState === 'ended') {
-    startGame();
-    return;
-  }
-  // During gameplay
-  if (document.pointerLockElement) {
-    // Already locked — register shot
-    registerShot();
-  } else {
-    // Request lock
-    document.body.requestPointerLock();
-  }
-}
-
-function registerShot() {
-  totalShots++;
-  let hit = false;
-
-  // Check each target — project to screen and see if crosshair is near
-  for (let t of targets) {
-    if (!t.alive) continue;
-    let screenPos = worldToScreen(t.pos);
-    if (!screenPos) continue;
-
-    let dx = screenPos.x - width/2;
-    let dy = screenPos.y - height/2;
-    let dist = Math.sqrt(dx*dx + dy*dy);
-
-    // Hit detection: target radius in screen space
-    let projSize = t.size * abs(screenPos.s) / abs(screenPos.z);
-    if (dist < projSize + 15) { // 15px tolerance
-      hit = true;
-      onHit(t);
-      break;
-    }
-  }
-
-  if (!hit) {
-    onMiss();
-  }
-}
-
-function onHit(target) {
-  totalHits++;
-  score += 10 * combo;
-  combo++;
-  if (combo > maxCombo) maxCombo = combo;
-  lastHitTime = millis();
-  target.alive = false;
-
-  playHitSound();
-  showHitMarker();
-  showHitText('+' + (10 * (combo - 1)), false);
-
-  // Spawn particles at hit location
-  for (let i = 0; i < 15; i++) {
-    particles.push(new Particle(target.pos.x, target.pos.y, target.pos.z));
-  }
-
-  updateHUD();
-}
-
-function onMiss() {
-  playMissSound();
-  showHitText('MISS', true);
-  combo = 1;
-  updateHUD();
-}
-
-function showHitMarker() {
-  let el = document.getElementById('hit-marker');
-  el.classList.add('show');
-  setTimeout(() => el.classList.remove('show'), 120);
-}
-
-function showHitText(text, isMiss) {
-  let el = document.createElement('div');
-  el.className = 'hit-text' + (isMiss ? ' miss' : '');
-  el.textContent = text;
-  document.getElementById('overlay').appendChild(el);
-  setTimeout(() => el.remove(), 600);
-}
-
-function worldToScreen(worldPos) {
-  // Project 3D world position to 2D screen coordinates
-  let mv = modelViewMatrix;
-  let p = projectionMatrix;
-
-  // Transform world pos to clip space
-  let x = mv.mat[0]*worldPos.x + mv.mat[4]*worldPos.y + mv.mat[8]*worldPos.z + mv.mat[12];
-  let y = mv.mat[1]*worldPos.x + mv.mat[5]*worldPos.y + mv.mat[9]*worldPos.z + mv.mat[13];
-  let z = mv.mat[2]*worldPos.x + mv.mat[6]*worldPos.y + mv.mat[10]*worldPos.z + mv.mat[14];
-  let w = mv.mat[3]*worldPos.x + mv.mat[7]*worldPos.y + mv.mat[11]*worldPos.z + mv.mat[15];
-
-  // Apply projection
-  let px = p.mat[0]*x + p.mat[4]*y + p.mat[8]*z + p.mat[12]*w;
-  let py = p.mat[1]*x + p.mat[5]*y + p.mat[9]*z + p.mat[13]*w;
-  let pw = p.mat[3]*x + p.mat[7]*y + p.mat[11]*z + p.mat[15]*w;
-
-  if (pw <= 0) return null; // Behind camera
-
-  // NDC to screen
-  let ndcX = px / pw;
-  let ndcY = py / pw;
-
-  // Scale factor (how big this point appears — for hit detection radius)
-  let s = 1.0 / pw;
-
+// ============== SCREEN PROJECTION ==============
+function project(wx, wy, wz) {
+  // Multiply by modelView then projection
+  let mv = modelViewMatrix.mat, p = projectionMatrix.mat;
+  let x = mv[0]*wx + mv[4]*wy + mv[8]*wz + mv[12];
+  let y = mv[1]*wx + mv[5]*wy + mv[9]*wz + mv[13];
+  let z = mv[2]*wx + mv[6]*wy + mv[10]*wz + mv[14];
+  let w = mv[3]*wx + mv[7]*wy + mv[11]*wz + mv[15];
+  let px = p[0]*x + p[4]*y + p[8]*z + p[12]*w;
+  let py = p[1]*x + p[5]*y + p[9]*z + p[13]*w;
+  let pw = p[3]*x + p[7]*y + p[11]*z + p[15]*w;
+  if (pw <= 0.01) return null;
   return {
-    x: (ndcX * 0.5 + 0.5) * width,
-    y: (-ndcY * 0.5 + 0.5) * height,
-    z: pw,
-    s: s
+    sx: (px/pw * 0.5 + 0.5) * width,
+    sy: (-py/pw * 0.5 + 0.5) * height,
+    scale: 1 / pw
   };
 }
 
-function draw() {
-  background(12, 12, 24);
+// ============== CAMERA ==============
+function setCamera() {
+  let lx = Math.sin(camYaw) * Math.cos(camPitch);
+  let ly = Math.sin(camPitch);
+  let lz = -Math.cos(camYaw) * Math.cos(camPitch);
+  camera(0,0,0, lx*100, ly*100, lz*100, 0,1,0);
+}
 
-  if (gameState === 'menu' || gameState === 'ended') {
-    drawMenuScene();
-    return;
-  }
-
-  // --- Gameplay ---
-  // Timer
-  timeRemaining = CFG.GAME_TIME - (millis() - gameStartTime) / 1000;
-  if (timeRemaining <= 0) {
-    endGame();
-    return;
-  }
-  document.getElementById('timer-bar').style.width = ((timeRemaining / CFG.GAME_TIME) * 100) + '%';
-
-  // Combo decay
-  if (millis() - lastHitTime > CFG.COMBO_DECAY) {
-    if (combo > 1) {
-      combo = 1;
-      updateHUD();
+// ============== SHOT LOGIC ==============
+function shoot() {
+  shots++;
+  let best = null, bestDist = Infinity;
+  for (let t of targets) {
+    if (!t.alive) continue;
+    let pr = project(t.x, t.y, t.z);
+    if (!pr) continue;
+    let dx = pr.sx - width/2, dy = pr.sy - height/2;
+    let d = Math.sqrt(dx*dx + dy*dy);
+    let screenR = t.r * pr.scale * height;
+    if (d < screenR + 18 && d < bestDist) {
+      bestDist = d; best = t;
     }
   }
-
-  // Pointer lock: read mouse movement
-  if (document.pointerLockElement) {
-    camYaw += movedX * CFG.CAM_SENSITIVITY;
-    camPitch -= movedY * CFG.CAM_SENSITIVITY;
-    camPitch = constrain(camPitch, -HALF_PI + 0.01, HALF_PI - 0.01);
-  }
-
-  // Camera matrix
-  applyCamera();
-
-  // Lighting
-  ambientLight(40, 40, 60);
-  pointLight(200, 200, 255, 0, -500, 500);
-  pointLight(255, 150, 100, -400, 200, 300);
-
-  // Spawn targets
-  if (millis() - lastSpawnTime > CFG.TARGET_SPAWN_TIME && targets.length < CFG.MAX_TARGETS) {
-    targets.push(new Target());
-    lastSpawnTime = millis();
-  }
-
-  // Update & draw targets
-  for (let t of targets) {
-    t.update();
-    t.draw();
-  }
-  targets = targets.filter(t => !t.isExpired());
-
-  // Update & draw particles
-  for (let p of particles) {
-    p.update();
-    p.draw();
-  }
-  particles = particles.filter(p => p.life > 0);
-
-  // Ground plane
-  push();
-  translate(0, 400, 0);
-  rotateX(HALF_PI);
-  noStroke();
-  specularMaterial(25, 25, 40);
-  shininess(5);
-  plane(CFG.WORLD_SIZE, CFG.WORLD_SIZE);
-  pop();
-
-  // Grid lines on ground for depth perception
-  push();
-  translate(0, 400, 0);
-  rotateX(HALF_PI);
-  stroke(40, 40, 70, 80);
-  strokeWeight(1);
-  for (let i = -CFG.WORLD_SIZE/2; i <= CFG.WORLD_SIZE/2; i += 100) {
-    line(i, -CFG.WORLD_SIZE/2, i, CFG.WORLD_SIZE/2);
-    line(-CFG.WORLD_SIZE/2, i, CFG.WORLD_SIZE/2, i);
-  }
-  pop();
-
-  // Distance indicator (fog-like walls far away)
-  push();
-  noStroke();
-  ambientMaterial(15, 15, 30);
-  translate(0, 0, -CFG.WORLD_SIZE/2);
-  plane(CFG.WORLD_SIZE, 800);
-  pop();
+  if (best) hitTarget(best);
+  else missShot();
 }
 
-function applyCamera() {
-  // FPS camera from yaw/pitch
-  let lookX = Math.sin(camYaw) * Math.cos(camPitch);
-  let lookY = Math.sin(camPitch);
-  let lookZ = -Math.cos(camYaw) * Math.cos(camPitch);
-
-  camera(
-    camX, camY, camZ,
-    camX + lookX * 100, camY + lookY * 100, camZ + lookZ * 100,
-    0, 1, 0
-  );
+function hitTarget(t) {
+  t.alive = false;
+  hits++;
+  let pts = 10 * combo;
+  score += pts;
+  combo++;
+  if (combo > maxCombo) maxCombo = combo;
+  lastHit = performance.now();
+  sndHit();
+  if (combo >= 5 && combo % 5 === 0) sndKill();
+  flashMarker();
+  floatText('+' + pts, false);
+  trailRings.push(new TrailRing(t.x, t.y, t.z));
+  for (let i = 0; i < 18; i++) sparks.push(new Spark(t.x, t.y, t.z));
+  refreshHUD();
 }
 
-function drawMenuScene() {
-  // Floating camera
-  let t = millis() * 0.0003;
-  let lx = Math.sin(t) * 500;
-  let lz = Math.cos(t) * -800;
-  camera(lx, -100, lz, 0, 0, -500, 0, 1, 0);
-
-  ambientLight(40, 40, 60);
-  pointLight(200, 200, 255, 0, -500, 500);
-
-  // Some decorative spheres
-  for (let i = 0; i < 8; i++) {
-    push();
-    let a = (TWO_PI / 8) * i + millis() * 0.001;
-    translate(Math.cos(a) * 300, Math.sin(a * 2) * 50 - 100, Math.sin(a) * 300 - 600);
-    specularMaterial(255, 80, 60);
-    shininess(80);
-    emissiveMaterial(120, 30, 20);
-    sphere(25);
-    pop();
-  }
-
-  // Ground
-  push();
-  translate(0, 200, -500);
-  rotateX(HALF_PI);
-  noStroke();
-  specularMaterial(20, 20, 35);
-  plane(2000, 2000);
-  pop();
+function missShot() {
+  sndMiss();
+  floatText('MISS', true);
+  combo = 1;
+  refreshHUD();
 }
 
+function flashMarker() {
+  let el = document.getElementById('cross');
+  el.style.filter = 'brightness(3)';
+  setTimeout(() => el.style.filter = '', 100);
+}
+
+function floatText(txt, isMiss) {
+  let el = document.createElement('div');
+  el.className = 'float-text';
+  el.textContent = txt;
+  el.style.cssText = `left:50%;top:50%;font-size:${isMiss?'16':'22'}px;color:${isMiss?'#ef5350':'#4fc3f7'};text-shadow:0 0 10px rgba(0,0,0,0.8);`;
+  document.body.appendChild(el);
+  setTimeout(() => el.remove(), 550);
+}
+
+// ============== HUD ==============
+function refreshHUD() {
+  document.getElementById('v-score').textContent = score;
+  document.getElementById('v-combo').textContent = 'x' + combo;
+}
+function updateTimer() {
+  timeLeft = Math.max(0, ROUND_TIME - (performance.now() - t0) / 1000);
+  document.getElementById('v-time').textContent = Math.ceil(timeLeft);
+  document.getElementById('timer-fill').style.width = ((timeLeft / ROUND_TIME) * 100) + '%';
+}
+
+// ============== GAME FLOW ==============
 function startGame() {
   initAudio();
-  gameState = 'playing';
-  score = 0;
-  combo = 1;
-  maxCombo = 1;
-  totalShots = 0;
-  totalHits = 0;
-  targets = [];
-  particles = [];
-  camYaw = 0;
-  camPitch = 0;
-  gameStartTime = millis();
-  lastSpawnTime = 0;
-  lastHitTime = 0;
-  timeRemaining = CFG.GAME_TIME;
-
-  document.getElementById('center-msg').style.display = 'none';
-  document.getElementById('reload-hint').style.display = 'none';
-  document.getElementById('timer-bar').style.width = '100%';
-  updateHUD();
-
+  state = 'play';
+  score = 0; combo = 1; maxCombo = 0; shots = 0; hits = 0;
+  targets = []; sparks = []; trailRings = [];
+  camYaw = 0; camPitch = 0;
+  t0 = performance.now();
+  lastSpawn = 0; lastHit = 0;
+  document.getElementById('center-panel').classList.add('hidden');
+  document.getElementById('timer-fill').style.width = '100%';
+  refreshHUD();
   document.body.requestPointerLock();
 }
 
 function endGame() {
-  gameState = 'ended';
+  state = 'end';
   document.exitPointerLock();
-
-  let accuracy = totalShots > 0 ? Math.round((totalHits / totalShots) * 100) : 0;
-
-  let msg = document.getElementById('center-msg');
-  msg.innerHTML = `
-    <h1>Time's Up!</h1>
-    <p style="font-size:22px; margin: 10px 0;">Score: <strong style="color:#4fc3f7">${score}</strong></p>
-    <p>Accuracy: ${accuracy}% | Max Combo: x${maxCombo}</p>
-    <p style="margin-top:8px; color:rgba(255,255,255,0.4);">${totalHits} hits / ${totalShots} shots</p>
-    <div class="click-hint">CLICK TO PLAY AGAIN</div>
+  let acc = shots > 0 ? Math.round(hits/shots*100) : 0;
+  let box = document.getElementById('panel-content');
+  box.innerHTML = `
+    <h1>تمام شد!</h1>
+    <div class="stat">امتیاز: <strong>${score}</strong></div>
+    <div class="stat">دقت: <strong>${acc}%</strong> (${hits}/${shots})</div>
+    <div class="stat">بیشترین کمبیو: <strong>x${maxCombo}</strong></div>
+    <div class="start-btn" id="btn-start">دوباره بازی کن</div>
   `;
-  msg.style.display = 'block';
+  document.getElementById('center-panel').classList.remove('hidden');
+  document.getElementById('btn-start').onclick = startGame;
 }
 
-function updateHUD() {
-  document.getElementById('score-val').textContent = score;
-  document.getElementById('combo-val').textContent = 'x' + combo;
+// ============== P5 SETUP & DRAW ==============
+function setup() {
+  createCanvas(windowWidth, windowHeight, WEBGL);
+  pixelDensity(1);
+  document.oncontextmenu = () => false;
+
+  document.body.addEventListener('click', () => {
+    if (state === 'menu' || state === 'end') return;
+    if (!document.pointerLockElement) {
+      document.body.requestPointerLock();
+    } else {
+      shoot();
+    }
+  });
+
+  document.getElementById('btn-start').onclick = startGame;
+
+  document.addEventListener('pointerlockchange', () => {
+    if (!document.pointerLockElement && state === 'play') {
+      document.getElementById('center-panel').classList.remove('hidden');
+      document.getElementById('panel-content').innerHTML = `
+        <h1>مکث</h1>
+        <div class="sub">برای ادامه کلیک کن یا ESC بزن</div>
+        <div class="start-btn" id="btn-resume">ادامه</div>
+      `;
+      document.getElementById('btn-resume').onclick = () => {
+        document.body.requestPointerLock();
+        document.getElementById('center-panel').classList.add('hidden');
+      };
+    }
+  });
+}
+
+function draw() {
+  background(10, 10, 18);
+
+  if (state === 'menu') {
+    drawMenuScene();
+    return;
+  }
+
+  if (state === 'end') {
+    drawMenuScene();
+    return;
+  }
+
+  // --- PLAY ---
+  updateTimer();
+  if (timeLeft <= 0) { endGame(); return; }
+
+  if (combo > 1 && performance.now() - lastHit > COMBO_TIMEOUT) {
+    combo = 1; refreshHUD();
+  }
+
+  if (document.pointerLockElement) {
+    camYaw += movedX * SENSITIVITY;
+    camPitch = Math.max(-1.5, Math.min(1.5, camPitch - movedY * SENSITIVITY));
+  }
+
+  setCamera();
+
+  ambientLight(35, 35, 50);
+  pointLight(180, 190, 255, 0, -600, 600);
+  pointLight(255, 130, 80, -500, 100, 300);
+  pointLight(100, 200, 255, 500, -200, 400);
+
+  // Spawn
+  if (performance.now() - lastSpawn > SPAWN_INTERVAL && targets.length < MAX_TARGETS) {
+    targets.push(new Target());
+    lastSpawn = performance.now();
+  }
+
+  // Targets
+  for (let t of targets) {
+    if (!t.alive || t.progress() >= 1) { t.alive = false; continue; }
+    t.update();
+    let a = t.progress();
+    let fade = a < 0.7 ? 1 : 1 - ((a - 0.7) / 0.3);
+    let sz = t.r * (0.5 + 0.5 * fade);
+
+    push();
+    translate(t.x, t.y, t.z);
+
+    // Outer shell
+    noStroke();
+    specularMaterial(255, 90, 60);
+    shininess(60);
+    emissiveMaterial(200, 50, 30, 180 * fade);
+    sphere(sz);
+
+    // Inner core
+    emissiveMaterial(255, 160, 80, 120 * fade);
+    sphere(sz * 0.5);
+
+    // Ring
+    noFill();
+    stroke(255, 200, 150, 200 * fade);
+    strokeWeight(1.5);
+    rotateX(HALF_PI);
+    ellipse(0, 0, sz * 2.6, sz * 2.6);
+
+    pop();
+  }
+  targets = targets.filter(t => t.alive);
+
+  // Sparks
+  for (let s of sparks) {
+    s.update();
+    push();
+    translate(s.x, s.y, s.z);
+    noStroke();
+    emissiveMaterial(s.r, s.g, s.b);
+    sphere(s.s * s.life);
+    pop();
+  }
+  sparks = sparks.filter(s => s.life > 0);
+
+  // Trail rings
+  for (let r of trailRings) {
+    let p = r.progress();
+    if (p >= 1) continue;
+    push();
+    translate(r.x, r.y, r.z);
+    noFill();
+    stroke(79, 195, 247, 255 * (1-p));
+    strokeWeight(2 * (1-p));
+    rotateX(HALF_PI);
+    ellipse(0, 0, r.life * 0.3 * p, r.life * 0.3 * p);
+    pop();
+  }
+  trailRings = trailRings.filter(r => r.progress() < 1);
+
+  // Ground
+  push();
+  translate(0, 450, -WORLD/3);
+  rotateX(HALF_PI);
+  noStroke();
+  specularMaterial(18, 18, 30);
+  shininess(2);
+  plane(WORLD, WORLD);
+  pop();
+
+  // Grid
+  push();
+  translate(0, 450, -WORLD/3);
+  rotateX(HALF_PI);
+  stroke(30, 30, 55, 60);
+  strokeWeight(0.5);
+  for (let i = -WORLD/2; i <= WORLD/2; i += 80) {
+    line(i, -WORLD/2, i, WORLD/2);
+    line(-WORLD/2, i, WORLD/2, i);
+  }
+  pop();
+
+  // Back wall (depth reference)
+  push();
+  translate(0, 0, -WORLD/2);
+  noStroke();
+  ambientMaterial(12, 12, 22);
+  plane(WORLD, 1000);
+  pop();
+}
+
+function drawMenuScene() {
+  let t = performance.now() * 0.0002;
+  let cx = Math.sin(t) * 400, cz = Math.cos(t) * -700;
+  camera(cx, -80, cz, 0, -50, -600, 0, 1, 0);
+
+  ambientLight(35, 35, 50);
+  pointLight(180, 190, 255, 0, -500, 500);
+
+  for (let i = 0; i < 10; i++) {
+    let a = (TWO_PI / 10) * i + performance.now() * 0.0008;
+    push();
+    translate(Math.cos(a) * 280, Math.sin(a*1.5)*40 - 80, Math.sin(a)*280 - 500);
+    noStroke();
+    specularMaterial(255, 80, 60);
+    shininess(60);
+    emissiveMaterial(140, 35, 20);
+    sphere(18 + Math.sin(performance.now()*0.003+i)*5);
+    pop();
+  }
+
+  push();
+  translate(0, 250, -500);
+  rotateX(HALF_PI);
+  noStroke();
+  specularMaterial(15, 15, 28);
+  plane(2000, 2000);
+  pop();
 }
 
 function windowResized() {
