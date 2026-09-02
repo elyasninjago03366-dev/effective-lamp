@@ -7,222 +7,621 @@
   <script>p5.disableFriendlyErrors = true;</script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.11.3/p5.min.js"></script>
   <style>
-    html, body { margin: 0; padding: 0; overflow: hidden; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #1a1a2e; color: #e0e0e0; }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body { width: 100%; height: 100%; overflow: hidden; background: #000; }
     canvas { display: block; }
+
     #overlay {
-      position: absolute;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      display: flex;
-      flex-direction: column;
-      justify-content: space-between;
-      pointer-events: none; /* Allows mouse events to pass through to canvas */
+      position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+      pointer-events: none; z-index: 10;
+      font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+      color: #fff;
     }
-    #score-display, #ammo-display {
-      padding: 15px;
-      font-size: 1.5em;
-      font-weight: bold;
-      text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
+
+    #hud-top {
+      display: flex; justify-content: space-between; align-items: flex-start;
+      padding: 20px 30px;
     }
-    #score-display { align-self: flex-start; }
-    #ammo-display { align-self: flex-end; }
+    #hud-top .hud-box {
+      background: rgba(0,0,0,0.5); border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 10px; padding: 12px 20px; backdrop-filter: blur(8px);
+    }
+    .hud-label { font-size: 11px; text-transform: uppercase; letter-spacing: 2px; color: rgba(255,255,255,0.5); }
+    .hud-value { font-size: 28px; font-weight: 700; margin-top: 2px; }
+    .hud-value.score-val { color: #4fc3f7; }
+    .hud-value.combo-val { color: #ffb74d; }
+    .hud-value.ammo-val { color: #ef5350; }
+
     #crosshair {
-      position: absolute;
-      top: 50%;
-      left: 50%;
-      width: 20px;
-      height: 20px;
-      margin-left: -10px;
-      margin-top: -10px;
-      border: 2px solid #ffcc00;
-      border-radius: 50%;
-      box-shadow: 0 0 10px #ffcc00;
-      pointer-events: none;
+      position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+      pointer-events: none; z-index: 20;
+    }
+    #crosshair::before, #crosshair::after {
+      content: ''; position: absolute; background: rgba(255,255,255,0.85);
+    }
+    #crosshair::before { width: 2px; height: 16px; top: -8px; left: -1px; }
+    #crosshair::after { width: 16px; height: 2px; top: -1px; left: -8px; }
+    #crosshair-dot {
+      width: 4px; height: 4px; border-radius: 50%; background: #ff1744;
+      position: absolute; top: -2px; left: -2px;
+    }
+
+    #center-msg {
+      position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+      text-align: center; pointer-events: auto; z-index: 30;
+    }
+    #center-msg h1 {
+      font-size: 48px; font-weight: 800; margin-bottom: 10px;
+      text-shadow: 0 0 30px rgba(79, 195, 247, 0.5);
+    }
+    #center-msg p { font-size: 16px; color: rgba(255,255,255,0.6); margin-top: 8px; }
+    #center-msg .click-hint {
+      display: inline-block; margin-top: 20px; padding: 12px 30px;
+      background: rgba(79, 195, 247, 0.2); border: 1px solid rgba(79, 195, 247, 0.4);
+      border-radius: 8px; font-size: 14px; color: #4fc3f7;
+      animation: pulse-hint 2s ease-in-out infinite;
+    }
+    @keyframes pulse-hint {
+      0%, 100% { opacity: 0.6; } 50% { opacity: 1; }
+    }
+
+    #hit-marker {
+      position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+      pointer-events: none; z-index: 25; opacity: 0;
+      transition: opacity 0.08s;
+    }
+    #hit-marker.show { opacity: 1; }
+    #hit-marker .line {
+      position: absolute; background: #fff; transform-origin: center;
+    }
+    #hit-marker .line:nth-child(1) { width: 2px; height: 12px; top: -18px; left: -1px; }
+    #hit-marker .line:nth-child(2) { width: 2px; height: 12px; top: 6px; left: -1px; }
+    #hit-marker .line:nth-child(3) { width: 12px; height: 2px; top: -1px; left: -18px; }
+    #hit-marker .line:nth-child(4) { width: 12px; height: 2px; top: -1px; left: 6px; }
+
+    .hit-text {
+      position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+      font-size: 24px; font-weight: 800; color: #4fc3f7;
+      pointer-events: none; z-index: 26;
+      animation: hit-float 0.6s ease-out forwards;
+    }
+    .hit-text.miss { color: #ef5350; font-size: 18px; }
+    @keyframes hit-float {
+      0% { opacity: 1; transform: translate(-50%, -50%) scale(1.2); }
+      100% { opacity: 0; transform: translate(-50%, -120%) scale(0.8); }
+    }
+
+    #reload-hint {
+      position: absolute; bottom: 15%; left: 50%; transform: translateX(-50%);
+      font-size: 14px; color: rgba(255,255,255,0.4); pointer-events: none;
+      z-index: 20; display: none;
+    }
+
+    #timer-bar {
+      position: absolute; bottom: 0; left: 0; height: 3px;
+      background: linear-gradient(90deg, #4fc3f7, #ff8a65);
+      transition: width 0.1s linear; z-index: 15;
     }
   </style>
 </head>
 <body>
 <div id="overlay">
-  <div id="score-display">Score: 0</div>
-  <div id="ammo-display">Ammo: 10</div>
-  <div id="crosshair"></div>
+  <div id="hud-top">
+    <div class="hud-box">
+      <div class="hud-label">Score</div>
+      <div class="hud-value score-val" id="score-val">0</div>
+    </div>
+    <div class="hud-box">
+      <div class="hud-label">Combo</div>
+      <div class="hud-value combo-val" id="combo-val">x1</div>
+    </div>
+    <div class="hud-box">
+      <div class="hud-label">Ammo</div>
+      <div class="hud-value ammo-val" id="ammo-val">∞</div>
+    </div>
+  </div>
+  <div id="crosshair"><div id="crosshair-dot"></div></div>
+  <div id="hit-marker"><div class="line"></div><div class="line"></div><div class="line"></div><div class="line"></div></div>
+  <div id="center-msg">
+    <h1>3D Aim Trainer</h1>
+    <p>Click targets as fast as you can. Track your mouse accuracy.</p>
+    <div class="click-hint">CLICK TO START</div>
+  </div>
+  <div id="reload-hint">Click to resume</div>
+  <div id="timer-bar"></div>
 </div>
+
 <script>
-let font;
-let targetPos;
+// ============ CONFIGURATION ============
+const CFG = {
+  GAME_TIME: 30,          // seconds per round
+  TARGET_MIN_SIZE: 20,
+  TARGET_MAX_SIZE: 50,
+  TARGET_SPAWN_TIME: 1500, // ms between spawns
+  TARGET_LIFETIME: 3000,   // ms before target disappears
+  MAX_TARGETS: 5,
+  WORLD_SIZE: 2000,        // world bounds
+  CAM_SENSITIVITY: 0.002,
+  COMBO_DECAY: 2000,       // ms before combo resets
+};
+
+// ============ AUDIO (Web Audio API) ============
+let audioCtx;
+function initAudio() {
+  audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+}
+function playHitSound() {
+  if (!audioCtx) return;
+  const osc = audioCtx.createOscillator();
+  const gain = audioCtx.createGain();
+  osc.connect(gain);
+  gain.connect(audioCtx.destination);
+  osc.type = 'sine';
+  osc.frequency.setValueAtTime(880, audioCtx.currentTime);
+  osc.frequency.exponentialRampToValueAtTime(1760, audioCtx.currentTime + 0.05);
+  gain.gain.setValueAtTime(0.15, audioCtx.currentTime);
+  gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.1);
+  osc.start(audioCtx.currentTime);
+  osc.stop(audioCtx.currentTime + 0.1);
+}
+function playMissSound() {
+  if (!audioCtx) return;
+  const osc = audioCtx.createOscillator();
+  const gain = audioCtx.createGain();
+  osc.connect(gain);
+  gain.connect(audioCtx.destination);
+  osc.type = 'sawtooth';
+  osc.frequency.setValueAtTime(150, audioCtx.currentTime);
+  osc.frequency.exponentialRampToValueAtTime(80, audioCtx.currentTime + 0.15);
+  gain.gain.setValueAtTime(0.08, audioCtx.currentTime);
+  gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.15);
+  osc.start(audioCtx.currentTime);
+  osc.stop(audioCtx.currentTime + 0.15);
+}
+
+// ============ GAME STATE ============
+let gameState = 'menu'; // menu, playing, ended
 let score = 0;
-let ammo = 10;
-let targetSize = 50;
-let lastShotTime = 0;
-const shotCooldown = 300; // ms between shots
+let combo = 1;
+let maxCombo = 1;
+let lastHitTime = 0;
+let targets = [];
+let particles = [];
+let lastSpawnTime = 0;
+let gameStartTime = 0;
+let timeRemaining = CFG.GAME_TIME;
+let totalShots = 0;
+let totalHits = 0;
 
-function setup() {
-  createCanvas(windowWidth, windowHeight, WEBGL);
-  // Disable right-click context menu
-  document.oncontextmenu = function() { return false; }
-  resetTarget();
-  updateHUD();
-}
+// Camera state (Euler angles, FPS style)
+let camYaw = 0;
+let camPitch = 0;
+let camX = 0, camY = 0, camZ = 0;
 
-function draw() {
-  background(26, 26, 46); // Dark blue/purple background
+// ============ TARGET CLASS ============
+class Target {
+  constructor() {
+    this.pos = createVector(
+      random(-CFG.WORLD_SIZE/3, CFG.WORLD_SIZE/3),
+      random(-300, 300),
+      random(-1500, -200)
+    );
+    this.size = random(CFG.TARGET_MIN_SIZE, CFG.TARGET_MAX_SIZE);
+    this.spawnTime = millis();
+    this.lifetime = random(2000, CFG.TARGET_LIFETIME);
+    this.alive = true;
+    this.hitAnim = 0;
+    this.bobOffset = random(TWO_PI);
+    this.bobSpeed = random(0.02, 0.06);
+    this.driftX = random(-0.3, 0.3);
+    this.driftY = random(-0.2, 0.2);
+  }
 
-  // Camera control with mouse (first-person style)
-  let camX = map(mouseX, 0, width, -width / 2, width / 2);
-  let camY = map(mouseY, 0, height, -height / 2, height / 2);
-  camera(camX, camY, (height/2) / tan(PI/6), 0, 0, 0, 0, 1, 0);
-
-  // Lighting
-  pointLight(200, 200, 255, -200, -200, 500); // Blueish light from top-left-front
-  ambientLight(50); // Subtle ambient light
-
-  // Draw Target
-  push();
-  translate(targetPos.x, targetPos.y, targetPos.z);
-  rotateY(frameCount * 0.01);
-  rotateX(frameCount * 0.005);
-
-  // Target material
-  specularMaterial(255, 100, 100); // Reddish-pink
-  shininess(20);
-  sphere(targetSize);
-
-  // Pulsating glow (emissive material)
-  let pulse = map(sin(frameCount * 0.05), -1, 1, 0.5, 1.5);
-  emissiveMaterial(150 * pulse, 0, 0);
-  sphere(targetSize * 0.9); // Inner glowing sphere
-
-  pop();
-
-  // Ground plane
-  push();
-  translate(0, 200, 0);
-  rotateX(HALF_PI);
-  noStroke();
-  specularMaterial(50, 50, 70); // Dark grey ground
-  shininess(1);
-  plane(1000, 1000);
-  pop();
-}
-
-function mousePressed() {
-  // Only register clicks if ammo is available and cooldown is over
-  if (ammo > 0 && millis() - lastShotTime > shotCooldown) {
-    ammo--;
-    lastShotTime = millis();
-    updateHUD();
-
-    // Raycasting to check if target is hit
-    let ray = getRayFromMouse();
-    let hit = intersectRaySphere(ray.origin, ray.direction, targetPos, targetSize);
-
-    if (hit) {
-      score++;
-      resetTarget();
-      updateHUD();
-      console.log("Hit! Score: " + score);
-    } else {
-      console.log("Miss. Ammo: " + ammo);
+  update() {
+    let age = millis() - this.spawnTime;
+    if (age > this.lifetime) {
+      this.alive = false;
+      // Missed target breaks combo
+      if (gameState === 'playing' && millis() - lastHitTime > CFG.COMBO_DECAY) {
+        combo = 1;
+      }
+      return;
     }
+    this.pos.x += this.driftX;
+    this.pos.y += Math.sin(millis() * this.bobSpeed * 0.01 + this.bobOffset) * 0.5;
+  }
 
-    if (ammo === 0) {
-      setTimeout(() => {
-        alert(`Game Over! Final Score: ${score}`);
-        score = 0;
-        ammo = 10;
-        resetTarget();
-        updateHUD();
-      }, 500); // Small delay before alert
-    }
+  draw() {
+    let age = millis() - this.spawnTime;
+    let lifeRatio = age / this.lifetime;
+    let alpha = lifeRatio < 0.8 ? 1 : map(lifeRatio, 0.8, 1, 1, 0);
+    let fadeScale = lifeRatio < 0.8 ? 1 : map(lifeRatio, 0.8, 1, 1, 0.3);
+
+    push();
+    translate(this.pos.x, this.pos.y, this.pos.z);
+
+    // Outer ring
+    noFill();
+    strokeWeight(2);
+    stroke(255, 100, 80, 255 * alpha);
+    sphere(this.size * fadeScale);
+
+    // Inner core
+    specularMaterial(255, 80, 60);
+    shininess(50);
+    emissiveMaterial(180, 40, 30);
+    sphere(this.size * 0.6 * fadeScale);
+
+    // Glow
+    emissiveMaterial(255, 100, 60, 100 * alpha);
+    sphere(this.size * 0.8 * fadeScale);
+
+    pop();
+  }
+
+  isExpired() {
+    return !this.alive;
   }
 }
 
-function resetTarget() {
-  targetPos = createVector(
-    random(-width / 3, width / 3),
-    random(-height / 3, height / 3),
-    random(-500, -100)
+// ============ PARTICLE CLASS ============
+class Particle {
+  constructor(x, y, z) {
+    this.pos = createVector(x, y, z);
+    this.vel = p5.Vector.random3D().mult(random(2, 8));
+    this.life = 1;
+    this.decay = random(0.02, 0.05);
+    this.size = random(3, 8);
+    this.col = [
+      random(200, 255), random(80, 200), random(40, 100)
+    ];
+  }
+  update() {
+    this.pos.add(this.vel);
+    this.vel.mult(0.96);
+    this.life -= this.decay;
+  }
+  draw() {
+    push();
+    translate(this.pos.x, this.pos.y, this.pos.z);
+    noStroke();
+    emissiveMaterial(this.col[0], this.col[1], this.col[2]);
+    sphere(this.size * this.life);
+    pop();
+  }
+}
+
+// ============ P5.JS LIFECYCLE ============
+function setup() {
+  let canvas = createCanvas(windowWidth, windowHeight, WEBGL);
+  canvas.style('display', 'block');
+
+  document.oncontextmenu = () => false;
+
+  // Pointer Lock
+  canvas.elt.addEventListener('click', onCanvasClick);
+
+  document.addEventListener('pointerlockchange', () => {
+    if (!document.pointerLockElement) {
+      if (gameState === 'playing') {
+        // Paused — show resume hint
+        document.getElementById('reload-hint').style.display = 'block';
+        document.getElementById('center-msg').style.display = 'none';
+      }
+    } else {
+      document.getElementById('reload-hint').style.display = 'none';
+      document.getElementById('center-msg').style.display = 'none';
+    }
+  });
+}
+
+function onCanvasClick() {
+  if (gameState === 'menu') {
+    startGame();
+    return;
+  }
+  if (gameState === 'ended') {
+    startGame();
+    return;
+  }
+  // During gameplay
+  if (document.pointerLockElement) {
+    // Already locked — register shot
+    registerShot();
+  } else {
+    // Request lock
+    document.body.requestPointerLock();
+  }
+}
+
+function registerShot() {
+  totalShots++;
+  let hit = false;
+
+  // Check each target — project to screen and see if crosshair is near
+  for (let t of targets) {
+    if (!t.alive) continue;
+    let screenPos = worldToScreen(t.pos);
+    if (!screenPos) continue;
+
+    let dx = screenPos.x - width/2;
+    let dy = screenPos.y - height/2;
+    let dist = Math.sqrt(dx*dx + dy*dy);
+
+    // Hit detection: target radius in screen space
+    let projSize = t.size * abs(screenPos.s) / abs(screenPos.z);
+    if (dist < projSize + 15) { // 15px tolerance
+      hit = true;
+      onHit(t);
+      break;
+    }
+  }
+
+  if (!hit) {
+    onMiss();
+  }
+}
+
+function onHit(target) {
+  totalHits++;
+  score += 10 * combo;
+  combo++;
+  if (combo > maxCombo) maxCombo = combo;
+  lastHitTime = millis();
+  target.alive = false;
+
+  playHitSound();
+  showHitMarker();
+  showHitText('+' + (10 * (combo - 1)), false);
+
+  // Spawn particles at hit location
+  for (let i = 0; i < 15; i++) {
+    particles.push(new Particle(target.pos.x, target.pos.y, target.pos.z));
+  }
+
+  updateHUD();
+}
+
+function onMiss() {
+  playMissSound();
+  showHitText('MISS', true);
+  combo = 1;
+  updateHUD();
+}
+
+function showHitMarker() {
+  let el = document.getElementById('hit-marker');
+  el.classList.add('show');
+  setTimeout(() => el.classList.remove('show'), 120);
+}
+
+function showHitText(text, isMiss) {
+  let el = document.createElement('div');
+  el.className = 'hit-text' + (isMiss ? ' miss' : '');
+  el.textContent = text;
+  document.getElementById('overlay').appendChild(el);
+  setTimeout(() => el.remove(), 600);
+}
+
+function worldToScreen(worldPos) {
+  // Project 3D world position to 2D screen coordinates
+  let mv = modelViewMatrix;
+  let p = projectionMatrix;
+
+  // Transform world pos to clip space
+  let x = mv.mat[0]*worldPos.x + mv.mat[4]*worldPos.y + mv.mat[8]*worldPos.z + mv.mat[12];
+  let y = mv.mat[1]*worldPos.x + mv.mat[5]*worldPos.y + mv.mat[9]*worldPos.z + mv.mat[13];
+  let z = mv.mat[2]*worldPos.x + mv.mat[6]*worldPos.y + mv.mat[10]*worldPos.z + mv.mat[14];
+  let w = mv.mat[3]*worldPos.x + mv.mat[7]*worldPos.y + mv.mat[11]*worldPos.z + mv.mat[15];
+
+  // Apply projection
+  let px = p.mat[0]*x + p.mat[4]*y + p.mat[8]*z + p.mat[12]*w;
+  let py = p.mat[1]*x + p.mat[5]*y + p.mat[9]*z + p.mat[13]*w;
+  let pw = p.mat[3]*x + p.mat[7]*y + p.mat[11]*z + p.mat[15]*w;
+
+  if (pw <= 0) return null; // Behind camera
+
+  // NDC to screen
+  let ndcX = px / pw;
+  let ndcY = py / pw;
+
+  // Scale factor (how big this point appears — for hit detection radius)
+  let s = 1.0 / pw;
+
+  return {
+    x: (ndcX * 0.5 + 0.5) * width,
+    y: (-ndcY * 0.5 + 0.5) * height,
+    z: pw,
+    s: s
+  };
+}
+
+function draw() {
+  background(12, 12, 24);
+
+  if (gameState === 'menu' || gameState === 'ended') {
+    drawMenuScene();
+    return;
+  }
+
+  // --- Gameplay ---
+  // Timer
+  timeRemaining = CFG.GAME_TIME - (millis() - gameStartTime) / 1000;
+  if (timeRemaining <= 0) {
+    endGame();
+    return;
+  }
+  document.getElementById('timer-bar').style.width = ((timeRemaining / CFG.GAME_TIME) * 100) + '%';
+
+  // Combo decay
+  if (millis() - lastHitTime > CFG.COMBO_DECAY) {
+    if (combo > 1) {
+      combo = 1;
+      updateHUD();
+    }
+  }
+
+  // Pointer lock: read mouse movement
+  if (document.pointerLockElement) {
+    camYaw += movedX * CFG.CAM_SENSITIVITY;
+    camPitch -= movedY * CFG.CAM_SENSITIVITY;
+    camPitch = constrain(camPitch, -HALF_PI + 0.01, HALF_PI - 0.01);
+  }
+
+  // Camera matrix
+  applyCamera();
+
+  // Lighting
+  ambientLight(40, 40, 60);
+  pointLight(200, 200, 255, 0, -500, 500);
+  pointLight(255, 150, 100, -400, 200, 300);
+
+  // Spawn targets
+  if (millis() - lastSpawnTime > CFG.TARGET_SPAWN_TIME && targets.length < CFG.MAX_TARGETS) {
+    targets.push(new Target());
+    lastSpawnTime = millis();
+  }
+
+  // Update & draw targets
+  for (let t of targets) {
+    t.update();
+    t.draw();
+  }
+  targets = targets.filter(t => !t.isExpired());
+
+  // Update & draw particles
+  for (let p of particles) {
+    p.update();
+    p.draw();
+  }
+  particles = particles.filter(p => p.life > 0);
+
+  // Ground plane
+  push();
+  translate(0, 400, 0);
+  rotateX(HALF_PI);
+  noStroke();
+  specularMaterial(25, 25, 40);
+  shininess(5);
+  plane(CFG.WORLD_SIZE, CFG.WORLD_SIZE);
+  pop();
+
+  // Grid lines on ground for depth perception
+  push();
+  translate(0, 400, 0);
+  rotateX(HALF_PI);
+  stroke(40, 40, 70, 80);
+  strokeWeight(1);
+  for (let i = -CFG.WORLD_SIZE/2; i <= CFG.WORLD_SIZE/2; i += 100) {
+    line(i, -CFG.WORLD_SIZE/2, i, CFG.WORLD_SIZE/2);
+    line(-CFG.WORLD_SIZE/2, i, CFG.WORLD_SIZE/2, i);
+  }
+  pop();
+
+  // Distance indicator (fog-like walls far away)
+  push();
+  noStroke();
+  ambientMaterial(15, 15, 30);
+  translate(0, 0, -CFG.WORLD_SIZE/2);
+  plane(CFG.WORLD_SIZE, 800);
+  pop();
+}
+
+function applyCamera() {
+  // FPS camera from yaw/pitch
+  let lookX = Math.sin(camYaw) * Math.cos(camPitch);
+  let lookY = Math.sin(camPitch);
+  let lookZ = -Math.cos(camYaw) * Math.cos(camPitch);
+
+  camera(
+    camX, camY, camZ,
+    camX + lookX * 100, camY + lookY * 100, camZ + lookZ * 100,
+    0, 1, 0
   );
-  targetSize = random(40, 70); // Vary target size
+}
+
+function drawMenuScene() {
+  // Floating camera
+  let t = millis() * 0.0003;
+  let lx = Math.sin(t) * 500;
+  let lz = Math.cos(t) * -800;
+  camera(lx, -100, lz, 0, 0, -500, 0, 1, 0);
+
+  ambientLight(40, 40, 60);
+  pointLight(200, 200, 255, 0, -500, 500);
+
+  // Some decorative spheres
+  for (let i = 0; i < 8; i++) {
+    push();
+    let a = (TWO_PI / 8) * i + millis() * 0.001;
+    translate(Math.cos(a) * 300, Math.sin(a * 2) * 50 - 100, Math.sin(a) * 300 - 600);
+    specularMaterial(255, 80, 60);
+    shininess(80);
+    emissiveMaterial(120, 30, 20);
+    sphere(25);
+    pop();
+  }
+
+  // Ground
+  push();
+  translate(0, 200, -500);
+  rotateX(HALF_PI);
+  noStroke();
+  specularMaterial(20, 20, 35);
+  plane(2000, 2000);
+  pop();
+}
+
+function startGame() {
+  initAudio();
+  gameState = 'playing';
+  score = 0;
+  combo = 1;
+  maxCombo = 1;
+  totalShots = 0;
+  totalHits = 0;
+  targets = [];
+  particles = [];
+  camYaw = 0;
+  camPitch = 0;
+  gameStartTime = millis();
+  lastSpawnTime = 0;
+  lastHitTime = 0;
+  timeRemaining = CFG.GAME_TIME;
+
+  document.getElementById('center-msg').style.display = 'none';
+  document.getElementById('reload-hint').style.display = 'none';
+  document.getElementById('timer-bar').style.width = '100%';
+  updateHUD();
+
+  document.body.requestPointerLock();
+}
+
+function endGame() {
+  gameState = 'ended';
+  document.exitPointerLock();
+
+  let accuracy = totalShots > 0 ? Math.round((totalHits / totalShots) * 100) : 0;
+
+  let msg = document.getElementById('center-msg');
+  msg.innerHTML = `
+    <h1>Time's Up!</h1>
+    <p style="font-size:22px; margin: 10px 0;">Score: <strong style="color:#4fc3f7">${score}</strong></p>
+    <p>Accuracy: ${accuracy}% | Max Combo: x${maxCombo}</p>
+    <p style="margin-top:8px; color:rgba(255,255,255,0.4);">${totalHits} hits / ${totalShots} shots</p>
+    <div class="click-hint">CLICK TO PLAY AGAIN</div>
+  `;
+  msg.style.display = 'block';
 }
 
 function updateHUD() {
-  document.getElementById('score-display').innerText = `Score: ${score}`;
-  document.getElementById('ammo-display').innerText = `Ammo: ${ammo}`;
+  document.getElementById('score-val').textContent = score;
+  document.getElementById('combo-val').textContent = 'x' + combo;
 }
 
 function windowResized() {
   resizeCanvas(windowWidth, windowHeight);
 }
-
-// --- Raycasting Helper Functions ---
-// Gets a ray from the mouse position in 3D space
-function getRayFromMouse() {
-  // Convert mouse position to clip space
-  let mouseXNormalized = (mouseX / width) * 2 - 1;
-  let mouseYNormalized = (mouseY / height) * 2 - 1;
-
-  // Inverse projection matrix
-  let projInv = new p5.Matrix();
-  projInv.invert(projectionMatrix);
-
-  // Inverse camera matrix
-  let camInv = new p5.Matrix();
-  camInv.invert(modelViewMatrix);
-
-  // Vector in clip space pointing to mouse
-  let v = createVector(mouseXNormalized, -mouseYNormalized, -1); // -1 for near plane
-  let v4 = createVector(v.x, v.y, v.z, 1);
-
-  // Transform to eye space
-  v4 = multMatrixVector(projInv, v4);
-  v4.z = -1; // Set to -1 for ray direction
-  v4.w = 0; // Set w to 0 for ray direction
-
-  // Transform to world space
-  v4 = multMatrixVector(camInv, v4);
-
-  let rayDirection = createVector(v4.x, v4.y, v4.z).normalize();
-  let rayOrigin = createVector(camInv.mat[12], camInv.mat[13], camInv.mat[14]); // Camera position
-
-  return { origin: rayOrigin, direction: rayDirection };
-}
-
-// Matrix-vector multiplication for p5.Matrix and p5.Vector
-function multMatrixVector(matrix, vector) {
-  let x = matrix.mat[0] * vector.x + matrix.mat[4] * vector.y + matrix.mat[8] * vector.z + matrix.mat[12] * vector.w;
-  let y = matrix.mat[1] * vector.x + matrix.mat[5] * vector.y + matrix.mat[9] * vector.z + matrix.mat[13] * vector.w;
-  let z = matrix.mat[2] * vector.x + matrix.mat[6] * vector.y + matrix.mat[10] * vector.z + matrix.mat[14] * vector.w;
-  let w = matrix.mat[3] * vector.x + matrix.mat[7] * vector.y + matrix.mat[11] * vector.z + matrix.mat[15] * vector.w;
-  return createVector(x, y, z, w);
-}
-
-
-// Ray-sphere intersection test
-function intersectRaySphere(rayOrigin, rayDirection, sphereCenter, sphereRadius) {
-  let L = p5.Vector.sub(sphereCenter, rayOrigin);
-  let tca = L.dot(rayDirection);
-  if (tca < 0) return false; // Sphere is behind the ray origin
-
-  let d2 = L.magSq() - (tca * tca);
-  let radius2 = sphereRadius * sphereRadius;
-  if (d2 > radius2) return false; // Ray misses the sphere
-
-  let thc = sqrt(radius2 - d2);
-  let t0 = tca - thc;
-  let t1 = tca + thc;
-
-  // We are interested in the closest intersection point that is in front of the ray origin
-  if (t0 < 0 && t1 < 0) return false; // Both intersection points are behind the ray origin
-  if (t0 < 0) t0 = t1; // If t0 is behind, use t1
-
-  // Point of intersection: rayOrigin + t0 * rayDirection
-  // For aim trainer, we only care if it hits, not the exact point
-  return true;
-}
-
 </script>
 </body>
 </html>
