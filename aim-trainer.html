@@ -4,6 +4,8 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Aim Trainer</title>
+  <script>p5.disableFriendlyErrors = true;</script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.11.3/p5.min.js"></script>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body { overflow: hidden; background: #0a0a0f; font-family: 'Segoe UI', system-ui, sans-serif; }
@@ -12,8 +14,9 @@
     #hud {
       position: fixed; top: 0; left: 0; width: 100%; padding: 18px 28px;
       display: flex; justify-content: space-between; z-index: 10;
-      pointer-events: none;
+      pointer-events: none; opacity: 0; transition: opacity 0.3s;
     }
+    #hud.show { opacity: 1; }
     .hud-card {
       background: rgba(0,0,0,0.55); border: 1px solid rgba(255,255,255,0.08);
       border-radius: 12px; padding: 10px 22px; backdrop-filter: blur(12px);
@@ -26,46 +29,47 @@
 
     #cross {
       position: fixed; top: 50%; left: 50%; transform: translate(-50%,-50%);
-      z-index: 20; pointer-events: none;
+      z-index: 20; pointer-events: none; opacity: 0; transition: opacity 0.3s;
     }
+    #cross.show { opacity: 1; }
     .cross-line { position: absolute; background: rgba(255,255,255,0.9); }
     .cross-v { width: 2px; height: 18px; top: -9px; left: -1px; }
     .cross-h { width: 18px; height: 2px; top: -1px; left: -9px; }
     .cross-dot { width: 4px; height: 4px; border-radius: 50%; background: #ff1744; position: absolute; top: -2px; left: -2px; }
 
-    #center-panel {
+    #panel {
       position: fixed; inset: 0; display: flex; align-items: center; justify-content: center;
-      z-index: 50; pointer-events: auto;
+      z-index: 50;
     }
-    #center-panel.hidden { display: none; }
-    .panel-box {
-      text-align: center; background: rgba(0,0,0,0.7); border: 1px solid rgba(255,255,255,0.06);
+    #panel.hidden { display: none; }
+    .pbox {
+      text-align: center; background: rgba(0,0,0,0.75); border: 1px solid rgba(255,255,255,0.06);
       border-radius: 20px; padding: 50px 70px; backdrop-filter: blur(20px);
     }
-    .panel-box h1 { font-size: 42px; font-weight: 800; color: #fff; margin-bottom: 6px; }
-    .panel-box .sub { font-size: 15px; color: rgba(255,255,255,0.45); margin-bottom: 24px; }
-    .panel-box .stat { font-size: 17px; color: rgba(255,255,255,0.7); margin: 4px 0; }
-    .panel-box .stat strong { color: #4fc3f7; font-weight: 700; }
-    .start-btn {
+    .pbox h1 { font-size: 42px; font-weight: 800; color: #fff; margin-bottom: 6px; }
+    .pbox .sub { font-size: 15px; color: rgba(255,255,255,0.45); margin-bottom: 24px; }
+    .pbox .stat { font-size: 17px; color: rgba(255,255,255,0.7); margin: 4px 0; }
+    .pbox .stat strong { color: #4fc3f7; font-weight: 700; }
+    .sbtn {
       display: inline-block; margin-top: 28px; padding: 14px 44px;
       background: rgba(79,195,247,0.15); border: 1px solid rgba(79,195,247,0.35);
       border-radius: 10px; color: #4fc3f7; font-size: 15px; font-weight: 600;
-      cursor: pointer; transition: all 0.2s; animation: glow 2s ease-in-out infinite;
+      cursor: pointer; user-select: none; transition: all 0.2s; animation: glow 2s ease-in-out infinite;
     }
-    .start-btn:hover { background: rgba(79,195,247,0.25); }
+    .sbtn:hover { background: rgba(79,195,247,0.25); }
     @keyframes glow { 0%,100%{opacity:0.7} 50%{opacity:1} }
 
     #timer-fill {
-      position: fixed; bottom: 0; left: 0; height: 3px; z-index: 15;
+      position: fixed; bottom: 0; left: 0; height: 3px; width: 100%;
       background: linear-gradient(90deg,#4fc3f7,#ff8a65);
-      transition: width 0.08s linear;
+      transition: width 0.08s linear; z-index: 15;
     }
 
-    .float-text {
+    .ftxt {
       position: fixed; pointer-events: none; z-index: 30; font-weight: 800;
-      animation: floatUp 0.55s ease-out forwards;
+      animation: fup 0.55s ease-out forwards;
     }
-    @keyframes floatUp {
+    @keyframes fup {
       0% { opacity: 1; transform: translate(-50%,0) scale(1.3); }
       100% { opacity: 0; transform: translate(-50%,-70px) scale(0.8); }
     }
@@ -74,9 +78,9 @@
 <body>
 
 <div id="hud">
-  <div class="hud-card"><div class="hud-label">Score</div><div class="hud-val c-blue" id="v-score">0</div></div>
-  <div class="hud-card"><div class="hud-label">Combo</div><div class="hud-val c-orange" id="v-combo">x1</div></div>
-  <div class="hud-card"><div class="hud-label">Time</div><div class="hud-val c-red" id="v-time">30</div></div>
+  <div class="hud-card"><div class="hud-label">Score</div><div class="hud-val c-blue" id="hs">0</div></div>
+  <div class="hud-card"><div class="hud-label">Combo</div><div class="hud-val c-orange" id="hc">x1</div></div>
+  <div class="hud-card"><div class="hud-label">Time</div><div class="hud-val c-red" id="ht">30</div></div>
 </div>
 
 <div id="cross">
@@ -85,422 +89,314 @@
   <div class="cross-dot"></div>
 </div>
 
-<div id="center-panel">
-  <div class="panel-box" id="panel-content">
+<div id="panel">
+  <div class="pbox" id="pbox">
     <h1>Aim Trainer</h1>
     <div class="sub">شلیک کن، ترکیب بزن، امتیاز بگیر</div>
-    <div class="start-btn" id="btn-start">CLICK TO START</div>
+    <div class="sbtn" id="startBtn">CLICK TO START</div>
   </div>
 </div>
 
 <div id="timer-fill"></div>
 
 <script>
-// ============== AUDIO ==============
+// ====== AUDIO ======
 let audioCtx;
-function initAudio() { audioCtx = new (window.AudioContext || window.webkitAudioContext)(); }
-function snd(freq, dur, type, vol) {
-  if (!audioCtx) return;
-  const o = audioCtx.createOscillator(), g = audioCtx.createGain();
-  o.connect(g); g.connect(audioCtx.destination);
-  o.type = type; o.frequency.setValueAtTime(freq, audioCtx.currentTime);
-  g.gain.setValueAtTime(vol, audioCtx.currentTime);
-  g.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + dur);
-  o.start(); o.stop(audioCtx.currentTime + dur);
+function initAudio() { if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)(); }
+function snd(f,d,t,v) {
+  if(!audioCtx)return;
+  const o=audioCtx.createOscillator(),g=audioCtx.createGain();
+  o.connect(g);g.connect(audioCtx.destination);
+  o.type=t;o.frequency.setValueAtTime(f,audioCtx.currentTime);
+  g.gain.setValueAtTime(v,audioCtx.currentTime);
+  g.gain.exponentialRampToValueAtTime(0.001,audioCtx.currentTime+d);
+  o.start();o.stop(audioCtx.currentTime+d);
 }
-function sndHit()  { snd(880,0.08,'sine',0.18); snd(1320,0.06,'sine',0.10); }
-function sndMiss() { snd(120,0.15,'sawtooth',0.07); }
-function sndKill() { snd(660,0.1,'sine',0.15); snd(990,0.15,'sine',0.12); snd(1320,0.2,'sine',0.08); }
+function sndHit(){snd(880,0.08,'sine',0.18);snd(1320,0.06,'sine',0.10)}
+function sndMiss(){snd(120,0.15,'sawtooth',0.07)}
 
-// ============== CONSTANTS ==============
-const ROUND_TIME = 30;
-const MAX_TARGETS = 6;
-const SPAWN_INTERVAL = 900;
-const TARGET_LIFE_MIN = 1200;
-const TARGET_LIFE_MAX = 3000;
-const SENSITIVITY = 0.0018;
-const COMBO_TIMEOUT = 2200;
-const WORLD = 1800;
+// ====== CONFIG ======
+const RTIME=30, MAXT=6, SPAWN_MS=900, TLIFE_MIN=1200, TLIFE_MAX=3000;
+const SENS=0.0018, COMBO_MS=2200, WSIZE=1800;
 
-// ============== STATE ==============
-let state = 'menu';
-let score, combo, maxCombo, shots, hits;
-let camYaw = 0, camPitch = 0;
-let targets = [];
-let sparks = [];
-let trailRings = [];
-let lastSpawn = 0;
-let t0 = 0;
-let lastHit = 0;
-let timeLeft = ROUND_TIME;
+// ====== STATE ======
+let G='menu'; // menu | play | paused | end
+let score=0, combo=1, maxCombo=0, shots=0, hits=0;
+let yaw=0, pitch=0;
+let targets=[], sparks=[], rings=[];
+let lastSpawn=0, gameStart=0, lastHit=0;
 
-// ============== TARGET ==============
-class Target {
-  constructor() {
-    this.x = (Math.random() - 0.5) * WORLD * 0.65;
-    this.y = (Math.random() - 0.5) * 500;
-    this.z = -200 - Math.random() * 1200;
-    this.r = 18 + Math.random() * 32;
-    this.born = performance.now();
-    this.life = TARGET_LIFE_MIN + Math.random() * (TARGET_LIFE_MAX - TARGET_LIFE_MIN);
-    this.drift = { x: (Math.random()-0.5)*0.4, y: (Math.random()-0.5)*0.3 };
-    this.phase = Math.random() * 6.28;
-    this.alive = true;
+// ====== DOM REFS ======
+let $hud, $cross, $panel, $pbox, $timer, $hs, $hc, $ht;
+
+// ====== TARGET ======
+class Tgt {
+  constructor(){
+    this.x=(Math.random()-0.5)*WSIZE*0.65;
+    this.y=(Math.random()-0.5)*500;
+    this.z=-200-Math.random()*1200;
+    this.r=18+Math.random()*32;
+    this.born=performance.now();
+    this.life=TLIFE_MIN+Math.random()*(TLIFE_MAX-TLIFE_MIN);
+    this.dx=(Math.random()-0.5)*0.4;
+    this.ph=Math.random()*6.28;
+    this.ok=true;
   }
-  age() { return performance.now() - this.born; }
-  progress() { return this.age() / this.life; }
-  alive() { return this.progress() < 1 && this.alive; }
-  update() {
-    this.x += this.drift.x;
-    this.y += Math.sin(performance.now() * 0.003 + this.phase) * 0.4;
+  prog(){return(performance.now()-this.born)/this.life}
+  update(){this.x+=this.dx;this.y+=Math.sin(performance.now()*0.003+this.ph)*0.4}
+}
+
+// ====== SPARK ======
+class Spk {
+  constructor(x,y,z){
+    this.x=x;this.y=y;this.z=z;
+    this.vx=(Math.random()-0.5)*12;this.vy=(Math.random()-0.5)*12;this.vz=(Math.random()-0.5)*12;
+    this.life=1;this.dec=0.025+Math.random()*0.03;
+    this.s=2+Math.random()*5;this.r=200+Math.random()*55;this.g=60+Math.random()*140;this.b=30+Math.random()*60;
   }
+  update(){this.x+=this.vx;this.y+=this.vy;this.z+=this.vz;this.vx*=.95;this.vy*=.95;this.vz*=.95;this.life-=this.dec}
 }
 
-// ============== SPARK ==============
-class Spark {
-  constructor(x,y,z) {
-    this.x=x; this.y=y; this.z=z;
-    this.vx=(Math.random()-0.5)*12;
-    this.vy=(Math.random()-0.5)*12;
-    this.vz=(Math.random()-0.5)*12;
-    this.life=1;
-    this.decay=0.025+Math.random()*0.03;
-    this.s=2+Math.random()*5;
-    this.r=200+Math.random()*55;
-    this.g=60+Math.random()*140;
-    this.b=30+Math.random()*60;
-  }
-  update(){ this.x+=this.vx; this.y+=this.vy; this.z+=this.vz; this.vx*=0.95; this.vy*=0.95; this.vz*=0.95; this.life-=this.decay; }
+// ====== PROJECTION ======
+function proj(wx,wy,wz){
+  let mv=modelViewMatrix.mat,p=projectionMatrix.mat;
+  let x=mv[0]*wx+mv[4]*wy+mv[8]*wz+mv[12];
+  let y=mv[1]*wx+mv[5]*wy+mv[9]*wz+mv[13];
+  let z=mv[2]*wx+mv[6]*wy+mv[10]*wz+mv[14];
+  let w=mv[3]*wx+mv[7]*wy+mv[11]*wz+mv[15];
+  let px=p[0]*x+p[4]*y+p[8]*z+p[12]*w;
+  let py=p[1]*x+p[5]*y+p[9]*z+p[13]*w;
+  let pw=p[3]*x+p[7]*y+p[11]*z+p[15]*w;
+  if(pw<=0.01)return null;
+  return{sx:(px/pw*0.5+0.5)*width,sy:(-py/pw*0.5+0.5)*height,sc:1/pw};
 }
 
-// ============== TRAIL RING ==============
-class TrailRing {
-  constructor(x,y,z) { this.x=x; this.y=y; this.z=z; this.born=performance.now(); this.life=400; }
-  progress(){ return (performance.now()-this.born)/this.life; }
+// ====== CAMERA ======
+function setCam(){
+  let lx=Math.sin(yaw)*Math.cos(pitch),ly=Math.sin(pitch),lz=-Math.cos(yaw)*Math.cos(pitch);
+  camera(0,0,0,lx*100,ly*100,lz*100,0,1,0);
 }
 
-// ============== SCREEN PROJECTION ==============
-function project(wx, wy, wz) {
-  // Multiply by modelView then projection
-  let mv = modelViewMatrix.mat, p = projectionMatrix.mat;
-  let x = mv[0]*wx + mv[4]*wy + mv[8]*wz + mv[12];
-  let y = mv[1]*wx + mv[5]*wy + mv[9]*wz + mv[13];
-  let z = mv[2]*wx + mv[6]*wy + mv[10]*wz + mv[14];
-  let w = mv[3]*wx + mv[7]*wy + mv[11]*wz + mv[15];
-  let px = p[0]*x + p[4]*y + p[8]*z + p[12]*w;
-  let py = p[1]*x + p[5]*y + p[9]*z + p[13]*w;
-  let pw = p[3]*x + p[7]*y + p[11]*z + p[15]*w;
-  if (pw <= 0.01) return null;
-  return {
-    sx: (px/pw * 0.5 + 0.5) * width,
-    sy: (-py/pw * 0.5 + 0.5) * height,
-    scale: 1 / pw
-  };
-}
-
-// ============== CAMERA ==============
-function setCamera() {
-  let lx = Math.sin(camYaw) * Math.cos(camPitch);
-  let ly = Math.sin(camPitch);
-  let lz = -Math.cos(camYaw) * Math.cos(camPitch);
-  camera(0,0,0, lx*100, ly*100, lz*100, 0,1,0);
-}
-
-// ============== SHOT LOGIC ==============
-function shoot() {
+// ====== SHOOT ======
+function shoot(){
+  if(G!=='play')return;
   shots++;
-  let best = null, bestDist = Infinity;
-  for (let t of targets) {
-    if (!t.alive) continue;
-    let pr = project(t.x, t.y, t.z);
-    if (!pr) continue;
-    let dx = pr.sx - width/2, dy = pr.sy - height/2;
-    let d = Math.sqrt(dx*dx + dy*dy);
-    let screenR = t.r * pr.scale * height;
-    if (d < screenR + 18 && d < bestDist) {
-      bestDist = d; best = t;
-    }
+  let best=null,bestD=Infinity;
+  for(let t of targets){
+    if(!t.ok)continue;
+    let pr=proj(t.x,t.y,t.z);
+    if(!pr)continue;
+    let dx=pr.sx-width/2,dy=pr.sy-height/2;
+    let d=Math.sqrt(dx*dx+dy*dy);
+    let sr=t.r*pr.sc*height;
+    if(d<sr+18&&d<bestD){bestD=d;best=t}
   }
-  if (best) hitTarget(best);
-  else missShot();
+  if(best)onHit(best);
+  else onMiss();
 }
-
-function hitTarget(t) {
-  t.alive = false;
-  hits++;
-  let pts = 10 * combo;
-  score += pts;
-  combo++;
-  if (combo > maxCombo) maxCombo = combo;
-  lastHit = performance.now();
+function onHit(t){
+  t.ok=false;hits++;
+  let pts=10*combo;score+=pts;combo++;
+  if(combo>maxCombo)maxCombo=combo;
+  lastHit=performance.now();
   sndHit();
-  if (combo >= 5 && combo % 5 === 0) sndKill();
-  flashMarker();
-  floatText('+' + pts, false);
-  trailRings.push(new TrailRing(t.x, t.y, t.z));
-  for (let i = 0; i < 18; i++) sparks.push(new Spark(t.x, t.y, t.z));
-  refreshHUD();
+  flashX();floatTxt('+'+pts,false);
+  for(let i=0;i<18;i++)sparks.push(new Spk(t.x,t.y,t.z));
+  updHUD();
+}
+function onMiss(){sndMiss();floatTxt('MISS',true);combo=1;updHUD()}
+function flashX(){$cross.style.filter='brightness(3)';setTimeout(()=>$cross.style.filter='',100)}
+function floatTxt(t,m){
+  let el=document.createElement('div');el.className='ftxt';el.textContent=t;
+  el.style.cssText='left:50%;top:50%;font-size:'+(m?'16':'22')+'px;color:'+(m?'#ef5350':'#4fc3f7')+';text-shadow:0 0 10px rgba(0,0,0,0.8)';
+  document.body.appendChild(el);setTimeout(()=>el.remove(),550);
 }
 
-function missShot() {
-  sndMiss();
-  floatText('MISS', true);
-  combo = 1;
-  refreshHUD();
+// ====== HUD ======
+function updHUD(){$hs.textContent=score;$hc.textContent='x'+combo}
+function updTimer(){
+  let tl=Math.max(0,RTIME-(performance.now()-gameStart)/1000);
+  $ht.textContent=Math.ceil(tl);
+  $timer.style.width=((tl/RTIME)*100)+'%';
+  return tl;
 }
 
-function flashMarker() {
-  let el = document.getElementById('cross');
-  el.style.filter = 'brightness(3)';
-  setTimeout(() => el.style.filter = '', 100);
-}
-
-function floatText(txt, isMiss) {
-  let el = document.createElement('div');
-  el.className = 'float-text';
-  el.textContent = txt;
-  el.style.cssText = `left:50%;top:50%;font-size:${isMiss?'16':'22'}px;color:${isMiss?'#ef5350':'#4fc3f7'};text-shadow:0 0 10px rgba(0,0,0,0.8);`;
-  document.body.appendChild(el);
-  setTimeout(() => el.remove(), 550);
-}
-
-// ============== HUD ==============
-function refreshHUD() {
-  document.getElementById('v-score').textContent = score;
-  document.getElementById('v-combo').textContent = 'x' + combo;
-}
-function updateTimer() {
-  timeLeft = Math.max(0, ROUND_TIME - (performance.now() - t0) / 1000);
-  document.getElementById('v-time').textContent = Math.ceil(timeLeft);
-  document.getElementById('timer-fill').style.width = ((timeLeft / ROUND_TIME) * 100) + '%';
-}
-
-// ============== GAME FLOW ==============
-function startGame() {
+// ====== GAME FLOW ======
+function startGame(){
   initAudio();
-  state = 'play';
-  score = 0; combo = 1; maxCombo = 0; shots = 0; hits = 0;
-  targets = []; sparks = []; trailRings = [];
-  camYaw = 0; camPitch = 0;
-  t0 = performance.now();
-  lastSpawn = 0; lastHit = 0;
-  document.getElementById('center-panel').classList.add('hidden');
-  document.getElementById('timer-fill').style.width = '100%';
-  refreshHUD();
+  G='play';
+  score=0;combo=1;maxCombo=0;shots=0;hits=0;
+  targets=[];sparks=[];
+  yaw=0;pitch=0;
+  gameStart=performance.now();
+  lastSpawn=0;lastHit=0;
+  $panel.classList.add('hidden');
+  $hud.classList.add('show');
+  $cross.classList.add('show');
+  $timer.style.width='100%';
+  updHUD();
+  // Pointer Lock MUST be in direct user gesture handler
   document.body.requestPointerLock();
 }
 
-function endGame() {
-  state = 'end';
+function endGame(){
+  G='end';
   document.exitPointerLock();
-  let acc = shots > 0 ? Math.round(hits/shots*100) : 0;
-  let box = document.getElementById('panel-content');
-  box.innerHTML = `
-    <h1>تمام شد!</h1>
-    <div class="stat">امتیاز: <strong>${score}</strong></div>
-    <div class="stat">دقت: <strong>${acc}%</strong> (${hits}/${shots})</div>
-    <div class="stat">بیشترین کمبیو: <strong>x${maxCombo}</strong></div>
-    <div class="start-btn" id="btn-start">دوباره بازی کن</div>
-  `;
-  document.getElementById('center-panel').classList.remove('hidden');
-  document.getElementById('btn-start').onclick = startGame;
+  $hud.classList.remove('show');
+  $cross.classList.remove('show');
+  let acc=shots>0?Math.round(hits/shots*100):0;
+  $pbox.innerHTML='<h1>تمام شد!</h1>'+
+    '<div class="stat">امتیاز: <strong>'+score+'</strong></div>'+
+    '<div class="stat">دقت: <strong>'+acc+'%</strong> ('+hits+'/'+shots+')</div>'+
+    '<div class="stat">بیشترین کمبیو: <strong>x'+maxCombo+'</strong></div>'+
+    '<div class="sbtn" id="startBtn">دوباره بازی کن</div>';
+  $panel.classList.remove('hidden');
+  bindStart();
 }
 
-// ============== P5 SETUP & DRAW ==============
-function setup() {
-  createCanvas(windowWidth, windowHeight, WEBGL);
-  pixelDensity(1);
-  document.oncontextmenu = () => false;
+function showPause(){
+  G='paused';
+  document.exitPointerLock();
+  $pbox.innerHTML='<h1>مکث</h1>'+
+    '<div class="sub">برای ادامه کلیک کن یا ESC بزن</div>'+
+    '<div class="sbtn" id="startBtn">ادامه</div>';
+  $panel.classList.remove('hidden');
+  bindStart();
+}
 
-  document.body.addEventListener('click', () => {
-    if (state === 'menu' || state === 'end') return;
-    if (!document.pointerLockElement) {
-      document.body.requestPointerLock();
-    } else {
+function resumeGame(){
+  G='play';
+  $panel.classList.add('hidden');
+  document.body.requestPointerLock();
+}
+
+function bindStart(){
+  let btn=document.getElementById('startBtn');
+  if(!btn)return;
+  btn.addEventListener('click',function handler(e){
+    e.stopPropagation();
+    btn.removeEventListener('click',handler);
+    if(G==='menu'||G==='end')startGame();
+    else if(G==='paused')resumeGame();
+  });
+}
+
+// ====== P5 ======
+function setup(){
+  createCanvas(windowWidth,windowHeight,WEBGL);
+  pixelDensity(1);
+  document.oncontextmenu=()=>false;
+
+  $hud=document.getElementById('hud');
+  $cross=document.getElementById('cross');
+  $panel=document.getElementById('panel');
+  $pbox=document.getElementById('pbox');
+  $timer=document.getElementById('timer-fill');
+  $hs=document.getElementById('hs');
+  $hc=document.getElementById('hc');
+  $ht=document.getElementById('ht');
+
+  bindStart();
+
+  // Canvas click: only handle shooting (during play)
+  document.querySelector('canvas').addEventListener('click',function(){
+    if(G==='play'&&document.pointerLockElement){
       shoot();
     }
   });
 
-  document.getElementById('btn-start').onclick = startGame;
-
-  document.addEventListener('pointerlockchange', () => {
-    if (!document.pointerLockElement && state === 'play') {
-      document.getElementById('center-panel').classList.remove('hidden');
-      document.getElementById('panel-content').innerHTML = `
-        <h1>مکث</h1>
-        <div class="sub">برای ادامه کلیک کن یا ESC بزن</div>
-        <div class="start-btn" id="btn-resume">ادامه</div>
-      `;
-      document.getElementById('btn-resume').onclick = () => {
-        document.body.requestPointerLock();
-        document.getElementById('center-panel').classList.add('hidden');
-      };
+  // Pointer Lock change
+  document.addEventListener('pointerlockchange',function(){
+    if(!document.pointerLockElement&&G==='play'){
+      showPause();
     }
   });
 }
 
-function draw() {
-  background(10, 10, 18);
+function draw(){
+  background(10,10,18);
 
-  if (state === 'menu') {
-    drawMenuScene();
+  if(G==='menu'||G==='end'||G==='paused'){
+    drawMenu();
     return;
   }
 
-  if (state === 'end') {
-    drawMenuScene();
-    return;
+  // === PLAY ===
+  let tl=updTimer();
+  if(tl<=0){endGame();return}
+
+  if(combo>1&&performance.now()-lastHit>COMBO_MS){combo=1;updHUD()}
+
+  if(document.pointerLockElement){
+    yaw+=movedX*SENS;
+    pitch=Math.max(-1.5,Math.min(1.5,pitch-movedY*SENS));
   }
 
-  // --- PLAY ---
-  updateTimer();
-  if (timeLeft <= 0) { endGame(); return; }
+  setCam();
 
-  if (combo > 1 && performance.now() - lastHit > COMBO_TIMEOUT) {
-    combo = 1; refreshHUD();
-  }
-
-  if (document.pointerLockElement) {
-    camYaw += movedX * SENSITIVITY;
-    camPitch = Math.max(-1.5, Math.min(1.5, camPitch - movedY * SENSITIVITY));
-  }
-
-  setCamera();
-
-  ambientLight(35, 35, 50);
-  pointLight(180, 190, 255, 0, -600, 600);
-  pointLight(255, 130, 80, -500, 100, 300);
-  pointLight(100, 200, 255, 500, -200, 400);
+  ambientLight(35,35,50);
+  pointLight(180,190,255,0,-600,600);
+  pointLight(255,130,80,-500,100,300);
+  pointLight(100,200,255,500,-200,400);
 
   // Spawn
-  if (performance.now() - lastSpawn > SPAWN_INTERVAL && targets.length < MAX_TARGETS) {
-    targets.push(new Target());
-    lastSpawn = performance.now();
+  if(performance.now()-lastSpawn>SPAWN_MS&&targets.length<MAXT){
+    targets.push(new Tgt());lastSpawn=performance.now();
   }
 
   // Targets
-  for (let t of targets) {
-    if (!t.alive || t.progress() >= 1) { t.alive = false; continue; }
+  for(let t of targets){
+    if(!t.ok||t.prog()>=1){t.ok=false;continue}
     t.update();
-    let a = t.progress();
-    let fade = a < 0.7 ? 1 : 1 - ((a - 0.7) / 0.3);
-    let sz = t.r * (0.5 + 0.5 * fade);
-
-    push();
-    translate(t.x, t.y, t.z);
-
-    // Outer shell
-    noStroke();
-    specularMaterial(255, 90, 60);
-    shininess(60);
-    emissiveMaterial(200, 50, 30, 180 * fade);
-    sphere(sz);
-
-    // Inner core
-    emissiveMaterial(255, 160, 80, 120 * fade);
-    sphere(sz * 0.5);
-
-    // Ring
-    noFill();
-    stroke(255, 200, 150, 200 * fade);
-    strokeWeight(1.5);
-    rotateX(HALF_PI);
-    ellipse(0, 0, sz * 2.6, sz * 2.6);
-
+    let p=t.prog();
+    let fade=p<0.7?1:1-((p-0.7)/0.3);
+    let sz=t.r*(0.5+0.5*fade);
+    push();translate(t.x,t.y,t.z);
+    noStroke();specularMaterial(255,90,60);shininess(60);
+    emissiveMaterial(200,50,30,180*fade);sphere(sz);
+    emissiveMaterial(255,160,80,120*fade);sphere(sz*0.5);
+    noFill();stroke(255,200,150,200*fade);strokeWeight(1.5);
+    rotateX(HALF_PI);ellipse(0,0,sz*2.6,sz*2.6);
     pop();
   }
-  targets = targets.filter(t => t.alive);
+  targets=targets.filter(t=>t.ok);
 
   // Sparks
-  for (let s of sparks) {
-    s.update();
-    push();
-    translate(s.x, s.y, s.z);
-    noStroke();
-    emissiveMaterial(s.r, s.g, s.b);
-    sphere(s.s * s.life);
-    pop();
+  for(let s of sparks){
+    s.update();push();translate(s.x,s.y,s.z);noStroke();
+    emissiveMaterial(s.r,s.g,s.b);sphere(s.s*s.life);pop();
   }
-  sparks = sparks.filter(s => s.life > 0);
-
-  // Trail rings
-  for (let r of trailRings) {
-    let p = r.progress();
-    if (p >= 1) continue;
-    push();
-    translate(r.x, r.y, r.z);
-    noFill();
-    stroke(79, 195, 247, 255 * (1-p));
-    strokeWeight(2 * (1-p));
-    rotateX(HALF_PI);
-    ellipse(0, 0, r.life * 0.3 * p, r.life * 0.3 * p);
-    pop();
-  }
-  trailRings = trailRings.filter(r => r.progress() < 1);
+  sparks=sparks.filter(s=>s.life>0);
 
   // Ground
-  push();
-  translate(0, 450, -WORLD/3);
-  rotateX(HALF_PI);
-  noStroke();
-  specularMaterial(18, 18, 30);
-  shininess(2);
-  plane(WORLD, WORLD);
-  pop();
+  push();translate(0,450,-WSIZE/3);rotateX(HALF_PI);
+  noStroke();specularMaterial(18,18,30);shininess(2);plane(WSIZE,WSIZE);pop();
 
   // Grid
-  push();
-  translate(0, 450, -WORLD/3);
-  rotateX(HALF_PI);
-  stroke(30, 30, 55, 60);
-  strokeWeight(0.5);
-  for (let i = -WORLD/2; i <= WORLD/2; i += 80) {
-    line(i, -WORLD/2, i, WORLD/2);
-    line(-WORLD/2, i, WORLD/2, i);
+  push();translate(0,450,-WSIZE/3);rotateX(HALF_PI);
+  stroke(30,30,55,60);strokeWeight(0.5);
+  for(let i=-WSIZE/2;i<=WSIZE/2;i+=80){line(i,-WSIZE/2,i,WSIZE/2);line(-WSIZE/2,i,WSIZE/2,i)}
+  pop();
+
+  // Back wall
+  push();translate(0,0,-WSIZE/2);noStroke();ambientMaterial(12,12,22);plane(WSIZE,1000);pop();
+}
+
+function drawMenu(){
+  let t=performance.now()*0.0002;
+  camera(Math.sin(t)*400,-80,Math.cos(t)*-700,0,-50,-600,0,1,0);
+  ambientLight(35,35,50);pointLight(180,190,255,0,-500,500);
+  for(let i=0;i<10;i++){
+    let a=(TWO_PI/10)*i+performance.now()*0.0008;
+    push();translate(Math.cos(a)*280,Math.sin(a*1.5)*40-80,Math.sin(a)*280-500);
+    noStroke();specularMaterial(255,80,60);shininess(60);
+    emissiveMaterial(140,35,20);sphere(18+Math.sin(performance.now()*0.003+i)*5);pop();
   }
-  pop();
-
-  // Back wall (depth reference)
-  push();
-  translate(0, 0, -WORLD/2);
-  noStroke();
-  ambientMaterial(12, 12, 22);
-  plane(WORLD, 1000);
-  pop();
+  push();translate(0,250,-500);rotateX(HALF_PI);
+  noStroke();specularMaterial(15,15,28);plane(2000,2000);pop();
 }
 
-function drawMenuScene() {
-  let t = performance.now() * 0.0002;
-  let cx = Math.sin(t) * 400, cz = Math.cos(t) * -700;
-  camera(cx, -80, cz, 0, -50, -600, 0, 1, 0);
-
-  ambientLight(35, 35, 50);
-  pointLight(180, 190, 255, 0, -500, 500);
-
-  for (let i = 0; i < 10; i++) {
-    let a = (TWO_PI / 10) * i + performance.now() * 0.0008;
-    push();
-    translate(Math.cos(a) * 280, Math.sin(a*1.5)*40 - 80, Math.sin(a)*280 - 500);
-    noStroke();
-    specularMaterial(255, 80, 60);
-    shininess(60);
-    emissiveMaterial(140, 35, 20);
-    sphere(18 + Math.sin(performance.now()*0.003+i)*5);
-    pop();
-  }
-
-  push();
-  translate(0, 250, -500);
-  rotateX(HALF_PI);
-  noStroke();
-  specularMaterial(15, 15, 28);
-  plane(2000, 2000);
-  pop();
-}
-
-function windowResized() {
-  resizeCanvas(windowWidth, windowHeight);
-}
+function windowResized(){resizeCanvas(windowWidth,windowHeight)}
 </script>
 </body>
 </html>
